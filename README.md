@@ -43,8 +43,26 @@ between tabs in the same browser on one computer:
 
 No database tables are needed for Step 1. The game uses Supabase "Realtime" messaging only.
 
-> Free Supabase projects pause after about a week of no use. If games stop connecting,
-> log in to Supabase and click **Restore project**.
+> Free Supabase projects pause after about a week of no use. The keep-awake ping below
+> prevents that. If games ever stop connecting, log in to Supabase and click **Restore project**.
+
+### Keep-awake ping (stops the free project from pausing)
+A GitHub Action (`.github/workflows/keepalive.yml`) reads one row from a tiny table every 3 days.
+One-time setup: in Supabase open **SQL Editor → New query**, paste this, and click **Run**:
+
+```sql
+create table if not exists public.keepalive (
+  id int primary key,
+  pinged_at timestamptz default now()
+);
+insert into public.keepalive (id) values (1) on conflict do nothing;
+alter table public.keepalive enable row level security;
+drop policy if exists "Anyone can read keepalive" on public.keepalive;
+create policy "Anyone can read keepalive" on public.keepalive for select using (true);
+```
+
+Then on GitHub, open the repo's **Actions** tab → **Supabase keep-awake ping** → **Run workflow** to test it.
+A green check means it works. If a ping ever fails, GitHub emails you.
 
 ### 2. Put the site online with GitHub Pages (free)
 The code lives at https://github.com/seanagain/wiserealm.
