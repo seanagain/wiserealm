@@ -1,4 +1,4 @@
-# ClassQuest: Boss Raid (Step 1)
+# Questly: Boss Raid (Step 1)
 
 Turn your question sets and vocabulary lists into a live class game. Students make a hero on
 their iPad, join with a code, and the whole class fights a boss on the projector by answering
@@ -28,7 +28,7 @@ between tabs in the same browser on one computer:
 
 ### 1. Create a free Supabase project (this relays messages between iPads and the projector)
 1. Go to **supabase.com** and click **Start your project**. Sign in with GitHub.
-2. Click **New project**. Name it `classquest`, make up a database password (save it somewhere), pick the region closest to you, and choose the **Free** plan.
+2. Click **New project**. Name it `questly`, make up a database password (save it somewhere), pick the region closest to you, and choose the **Free** plan.
 3. When it finishes setting up, open **Project Settings → API Keys**. Find the **Legacy API keys** tab and copy the **`anon` `public`** key.
 4. Open **Project Settings → Data API** (or the **Connect** button) and copy the **Project URL** (it looks like `https://abcdefgh.supabase.co`).
 5. Paste both into `js/config.js`:
@@ -47,14 +47,14 @@ No database tables are needed for Step 1. The game uses Supabase "Realtime" mess
 > log in to Supabase and click **Restore project**.
 
 ### 2. Put the site online with GitHub Pages (free)
-1. On GitHub, create a new **public** repository named `classquest`.
+1. On GitHub, create a new **public** repository named `questly`.
 2. Upload all the files from this folder (keep the `css` and `js` folders).
 3. In the repo, go to **Settings → Pages**. Under "Build and deployment", choose **Deploy from a branch**, then the `main` branch and `/ (root)` folder. Click **Save**.
-4. After a minute your site is at `https://YOUR-USERNAME.github.io/classquest/`.
+4. After a minute your site is at `https://YOUR-USERNAME.github.io/questly/`.
    - Students go to that address (or scan the QR code on the projector).
-   - You go to `https://YOUR-USERNAME.github.io/classquest/teacher.html`.
+   - You go to `https://YOUR-USERNAME.github.io/questly/teacher.html`.
 
-**Tip for iPads:** In Safari, tap Share → **Add to Home Screen** so ClassQuest opens like an app.
+**Tip for iPads:** In Safari, tap Share → **Add to Home Screen** so Questly opens like an app.
 
 ## How Boss Raid works
 

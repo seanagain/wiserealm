@@ -84,10 +84,10 @@ $('#setGrid').addEventListener('click', e => {
 });
 $('#newBtn').onclick = () => { const s = newSet(); upsertSet(s); openEditor(s); $('#titleInput').focus(); };
 $('#exportBtn').onclick = () => {
-  const blob = new Blob([JSON.stringify({ app: 'classquest', version: 1, sets: getSets() }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ app: 'questly', version: 1, sets: getSets() }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `classquest-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `questly-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
@@ -106,7 +106,7 @@ $('#importFile').onchange = async e => {
     }
     alert(`Restored ${n} question set(s).`);
     renderLib();
-  } catch { alert('That file doesn’t look like a ClassQuest backup.'); }
+  } catch { alert('That file doesn’t look like a Questly backup.'); }
   e.target.value = '';
 };
 
