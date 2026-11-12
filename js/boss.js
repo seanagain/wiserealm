@@ -1,35 +1,66 @@
-// Boss monsters for Boss Raid (original designs drawn in SVG).
+// Pixel-art bosses for Boss Raid (original designs, 32 x 28 pixels).
+// The sprite is drawn as a left half and mirrored to make it symmetrical.
+import { makeGrid, paint, dots, gridRects, shade } from './avatar.js';
+
 export const BOSSES = [
   { name: 'Grumblor the Slime King', body: '#5fd068', belly: '#b7f5a8', horn: '#f4d35e', crown: true },
-  { name: 'Magmaw the Molten', body: '#ff7a45', belly: '#ffc078', horn: '#5c2b1d' },
-  { name: 'Frostfang the Glacier Wyrm', body: '#4cc9f0', belly: '#d7f3fb', horn: '#f8f9fa' },
-  { name: 'Umbrax of the Void', body: '#7b2cbf', belly: '#c77dff', horn: '#ff4d6d' },
+  { name: 'Magmaw the Molten', body: '#ff7a45', belly: '#ffd08a', horn: '#5c2b1d' },
+  { name: 'Frostfang the Glacier Wyrm', body: '#4cc9f0', belly: '#e3f8ff', horn: '#f8f9fa' },
+  { name: 'Umbrax of the Void', body: '#8e44ad', belly: '#d7a6f5', horn: '#ff4d6d' },
 ];
+
+const LEFT = [
+  '................',
+  '....KK..........',
+  '....KHK.........',
+  '....KHHK........',
+  '.....KHHK.......',
+  '.....KHHHK......',
+  '......KHHKKKKKKK',
+  '.....KHHBBBBBBBB',
+  '.....KBBBBBBBBBB',
+  '....KBBBBBBBBBBB',
+  '....KBBBWWBBBBBB',
+  '...KBBBWWWWBBBBB',
+  '...KBBBWPPWBBBBB',
+  '...KBBBWPPWBBBBB',
+  '...KBBBBWWBBBBBB',
+  '..KBBBBBBBBBBBBB',
+  'KAKBBBMMMMMMMMMM',
+  'KAKBBBMTMMTMMTMM',
+  'KAKBBBBMMMMMMMMM',
+  'KKKBBBBLLLLLLLLL',
+  '.KBBBBLLLLLLLLLL',
+  '.KBBBBLLLLLLLLLL',
+  '.KBBBBBLLLLLLLLL',
+  '.KbBBBBBLLLLLLLL',
+  '..KbbBBBBBBBBBBB',
+  '...KKKbbbbbbbbbb',
+  '.....KKKKKKKKKKK',
+  '..oooooooooooooo',
+];
+const ROWS = LEFT.map(r => r + [...r].reverse().join(''));
+const mirror = list => list.flatMap(([x, y]) => [[x, y], [31 - x, y]]);
 
 export function bossSVG(i) {
   const b = BOSSES[i] || BOSSES[0];
-  const dark = 'rgba(0,0,0,.18)';
-  const teeth = [118, 134, 150, 166].map(x => `<path d="M${x} 153 L${x + 6} 166 L${x + 12} 155 Z" fill="#fff"/>`).join('');
-  return `<svg class="boss-svg" viewBox="0 0 300 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-<ellipse cx="150" cy="246" rx="112" ry="12" fill="rgba(0,0,0,.3)"/>
-<ellipse class="arm-l" cx="44" cy="165" rx="26" ry="42" fill="${b.body}" transform="rotate(20 44 165)"/>
-<ellipse class="arm-r" cx="256" cy="165" rx="26" ry="42" fill="${b.body}" transform="rotate(-20 256 165)"/>
-<ellipse cx="44" cy="165" rx="26" ry="42" fill="${dark}" transform="rotate(20 44 165)"/>
-<ellipse cx="256" cy="165" rx="26" ry="42" fill="${dark}" transform="rotate(-20 256 165)"/>
-<path d="M92 76 Q68 32 94 6 Q100 44 122 62 Z" fill="${b.horn}"/>
-<path d="M208 76 Q232 32 206 6 Q200 44 178 62 Z" fill="${b.horn}"/>
-<path d="M62 236 Q30 236 34 172 Q40 58 150 50 Q260 58 266 172 Q270 236 238 236 Z" fill="${b.body}"/>
-<path d="M62 236 Q30 236 34 172 Q36 120 70 90 Q48 150 70 236 Z" fill="${dark}"/>
-<ellipse cx="150" cy="188" rx="72" ry="44" fill="${b.belly}"/>
-${b.crown ? `<path d="M112 58 L112 30 L128 44 L140 22 L150 40 L160 22 L172 44 L188 30 L188 58 Z" fill="#ffd166" stroke="#c9a227" stroke-width="3" stroke-linejoin="round"/>` : ''}
-<g class="eyes">
-<circle cx="115" cy="112" r="25" fill="#fff"/><circle cx="185" cy="112" r="25" fill="#fff"/>
-<circle class="pupil" cx="118" cy="116" r="11" fill="#141414"/><circle class="pupil" cx="182" cy="116" r="11" fill="#141414"/>
-<circle cx="122" cy="111" r="3.5" fill="#fff"/><circle cx="186" cy="111" r="3.5" fill="#fff"/>
-</g>
-<g class="brows"><path d="M86 82 L138 98" stroke="#141414" stroke-width="9" stroke-linecap="round"/><path d="M214 82 L162 98" stroke="#141414" stroke-width="9" stroke-linecap="round"/></g>
-<path d="M104 148 Q150 192 196 148 Q150 164 104 148 Z" fill="#3a0d1a"/>
-${teeth}
-<g class="sweat"><path d="M238 92 Q246 106 238 112 Q230 106 238 92 Z" fill="#9be7ff"/><path d="M62 104 Q68 115 62 120 Q56 115 62 104 Z" fill="#9be7ff"/></g>
-</svg>`;
+  const pal = {
+    K: '#140f22', B: b.body, b: shade(b.body, -0.25), A: shade(b.body, -0.15), H: b.horn,
+    L: b.belly, W: '#ffffff', P: '#140f22', M: '#3a0d1a', T: '#ffffff', o: 'rgba(0,0,0,.3)',
+  };
+  const g = makeGrid(32, 28);
+  paint(g, { rows: ROWS }, pal);
+  dots(g, [[7, 8], [8, 8], [9, 8], [6, 9]], shade(b.body, 0.35)); // shine
+  if (b.crown) {
+    dots(g, [[12, 3], [15, 3], [16, 3], [19, 3], [12, 4], [13, 4], [15, 4], [16, 4], [18, 4], [19, 4]], '#ffd23f');
+    dots(g, [12, 13, 14, 15, 16, 17, 18, 19].map(x => [x, 5]), '#ffd23f');
+    dots(g, [12, 13, 14, 15, 16, 17, 18, 19].map(x => [x, 6]), '#c9961a');
+    dots(g, [[13, 6], [18, 6]], '#e63946');
+  }
+  const brows = makeGrid(32, 28);
+  dots(brows, mirror([[5, 8], [6, 8], [7, 9], [8, 9], [9, 9], [10, 10]]), '#140f22');
+  const sweat = makeGrid(32, 28);
+  dots(sweat, [[27, 7], [26, 8], [27, 8], [28, 8], [27, 9], [4, 11], [4, 12]], '#8fd8ff');
+  return `<svg class="boss-svg" viewBox="0 0 32 28" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+${gridRects(g)}<g class="brows">${gridRects(brows)}</g><g class="sweat">${gridRects(sweat)}</g></svg>`;
 }

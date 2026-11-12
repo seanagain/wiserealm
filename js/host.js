@@ -219,7 +219,7 @@ function startGame() {
   show('battleScreen');
   broadcast();
   $('#qText').textContent = ''; $('#hChoices').innerHTML = ''; $('#statusLine').textContent = ''; $('#roundMsg').textContent = '';
-  $('#introText').innerHTML = `⚔<br>${esc(BOSSES[S.boss].name)}<br><span style="font-size:.5em" class="muted">has appeared!</span>`;
+  $('#introText').innerHTML = `<span style="color:var(--bad)">!! WARNING !!</span><br>${esc(BOSSES[S.boss].name)}<br><span style="font-size:.5em" class="muted">has appeared!</span>`;
   $('#intro').classList.add('on');
   sfx('roar');
   $('#boss').classList.add('roar');

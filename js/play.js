@@ -152,7 +152,7 @@ function render(s) {
     shownKey = key;
     $('#waitHero').innerHTML = avatarSVG(profile.av);
     $('#waitName').textContent = profile.name;
-    if (s.phase === 'intro') { $('#waitTitle').textContent = '⚔ The boss is here!'; $('#waitSub').textContent = 'Get ready to answer…'; }
+    if (s.phase === 'intro') { $('#waitTitle').textContent = 'The boss is here!'; $('#waitSub').textContent = 'Get ready to answer…'; }
     else { $('#waitTitle').textContent = 'You’re in!'; $('#waitSub').textContent = 'Look at the big screen. Your teacher will start soon.'; }
     show('s-wait');
   } else if (s.phase === 'question') {
@@ -183,7 +183,7 @@ function renderQuestion(s) {
   const [dmg] = myStats(s);
   $('#qNum').textContent = `Question ${s.qi + 1} / ${s.total}`;
   $('#qBoss').textContent = `Boss HP ${bossPct(s)}%`;
-  $('#qDmg').textContent = `⚔ ${fmt(dmg)}`;
+  $('#qDmg').textContent = `DMG ${fmt(dmg)}`;
   $('#qPrompt').textContent = s.q.prompt;
   $('#pChoices').innerHTML = s.q.choices.map((c, i) =>
     `<button class="choice ${CHOICE_STYLE[i].cls}" data-c="${i}"><span class="ico">${CHOICE_STYLE[i].icon}</span><span>${esc(c)}</span></button>`).join('');
@@ -220,7 +220,7 @@ function renderResult(s) {
   hero.className = 'hero-big';
   const t = $('#resTitle');
   if (res && res[0] === s.correct) {
-    t.textContent = 'HIT! ⚔'; t.className = 'result-big good';
+    t.textContent = 'HIT!'; t.className = 'result-big good';
     $('#resSub').innerHTML = `You dealt <b style="color:var(--gold)">${fmt(res[1])}</b> damage!` + (streak >= 3 ? `<br>🔥 ${streak} in a row! Bonus damage!` : '');
     void hero.offsetWidth; hero.classList.add('hero-attack');
   } else {

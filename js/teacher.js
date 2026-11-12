@@ -23,7 +23,7 @@ function renderLib() {
       <h3>${esc(s.title)}</h3>
       <div class="muted">${cleanItems(s.items).length} questions · edited ${new Date(s.updated).toLocaleDateString()}</div>
       <div class="row">
-        <button class="btn primary small" data-play="${s.id}">⚔ Boss Raid</button>
+        <button class="btn primary small" data-play="${s.id}">Boss Raid</button>
         <button class="btn small" data-edit="${s.id}">Edit</button>
         <button class="btn small" data-dup="${s.id}">Duplicate</button>
       </div>
