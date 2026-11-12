@@ -221,7 +221,8 @@ function startGame() {
   $('#qText').textContent = ''; $('#hChoices').innerHTML = ''; $('#statusLine').textContent = ''; $('#roundMsg').textContent = '';
   $('#introText').innerHTML = `<span style="color:var(--bad)">!! WARNING !!</span><br>${esc(BOSSES[S.boss].name)}<br><span style="font-size:.5em" class="muted">has appeared!</span>`;
   $('#intro').classList.add('on');
-  sfx('roar');
+  sfx('warning');
+  later(() => sfx('roar'), 850);
   $('#boss').classList.add('roar');
   later(() => { $('#intro').classList.remove('on'); $('#boss').classList.remove('roar'); nextQuestion(); }, 2800);
 }
@@ -312,6 +313,7 @@ function endQuestion() {
   broadcast();
 
   // Reveal UI
+  sfx('reveal');
   $('#qpanel').classList.add('reveal');
   $('#skipBtn').hidden = true;
   $('#ring').style.visibility = 'hidden';
@@ -344,6 +346,7 @@ function endQuestion() {
     if (G.bossHp <= 0) {
       $('#boss').classList.add('dead');
       burst(true);
+      sfx('explode');
       later(() => endGame(true), 1900);
       return;
     }
@@ -389,7 +392,7 @@ function bossHit(h) {
   const b = $('#boss');
   b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit');
   floatText((h.crit ? 'CRIT ' : '') + fmt(h.dmg), h.crit ? 'crit' : '');
-  sfx('hit');
+  sfx(h.crit ? 'crit' : 'hit');
 }
 
 function floatText(text, cls) {

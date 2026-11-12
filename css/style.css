@@ -23,7 +23,9 @@
   --font: 'Pixelify Sans', ui-monospace, 'Courier New', monospace;
   --pixel: 'Press Start 2P', 'Pixelify Sans', monospace;
   --bevel: inset -4px -4px 0 rgba(0, 0, 0, .32), inset 4px 4px 0 rgba(255, 255, 255, .18);
-  --stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' shape-rendering='crispEdges'%3E%3Cg fill='%23fff'%3E%3Crect x='7' y='11' width='1' height='1'/%3E%3Crect x='41' y='5' width='1' height='1' opacity='.6'/%3E%3Crect x='70' y='19' width='2' height='2'/%3E%3Crect x='23' y='38' width='1' height='1' opacity='.5'/%3E%3Crect x='88' y='44' width='1' height='1'/%3E%3Crect x='55' y='60' width='1' height='1' opacity='.7'/%3E%3Crect x='12' y='75' width='2' height='2' opacity='.8'/%3E%3Crect x='77' y='83' width='1' height='1' opacity='.5'/%3E%3Crect x='36' y='90' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+  --bricks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='16' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='32' height='16' fill='%2315131d'/%3E%3Crect x='0' y='0' width='15' height='7' fill='%233a3650'/%3E%3Crect x='16' y='0' width='15' height='7' fill='%2334304a'/%3E%3Crect x='0' y='8' width='7' height='7' fill='%23383450'/%3E%3Crect x='8' y='8' width='15' height='7' fill='%233d3955'/%3E%3Crect x='24' y='8' width='8' height='7' fill='%23383450'/%3E%3Crect x='0' y='0' width='15' height='1' fill='%234a4566'/%3E%3Crect x='16' y='0' width='15' height='1' fill='%23433f5d'/%3E%3Crect x='0' y='8' width='7' height='1' fill='%2347425f'/%3E%3Crect x='8' y='8' width='15' height='1' fill='%234d4868'/%3E%3Crect x='24' y='8' width='8' height='1' fill='%2347425f'/%3E%3Crect x='0' y='6' width='15' height='1' fill='%2327243a'/%3E%3Crect x='16' y='6' width='15' height='1' fill='%2324213a'/%3E%3Crect x='0' y='14' width='7' height='1' fill='%2327243a'/%3E%3Crect x='8' y='14' width='15' height='1' fill='%232a273d'/%3E%3Crect x='24' y='14' width='8' height='1' fill='%2327243a'/%3E%3Crect x='5' y='3' width='2' height='1' fill='%232a2740'/%3E%3Crect x='20' y='4' width='1' height='1' fill='%232a2740'/%3E%3Crect x='21' y='3' width='1' height='1' fill='%232a2740'/%3E%3Crect x='12' y='11' width='2' height='1' fill='%232a2740'/%3E%3Crect x='27' y='10' width='1' height='1' fill='%232a2740'/%3E%3Crect x='3' y='12' width='1' height='1' fill='%232a2740'/%3E%3Crect x='9' y='2' width='1' height='1' fill='%2355507a'/%3E%3Crect x='28' y='4' width='1' height='1' fill='%234f4a6e'/%3E%3Crect x='17' y='12' width='1' height='1' fill='%2355507a'/%3E%3C/svg%3E");
+  --floor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='21' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='32' height='21' fill='%232c2838'/%3E%3Crect x='0' y='0' width='32' height='2' fill='%235a5474'/%3E%3Crect x='0' y='2' width='32' height='1' fill='%231a1824'/%3E%3Crect x='0' y='3' width='32' height='1' fill='%233c3752'/%3E%3Crect x='0' y='11' width='32' height='1' fill='%2317151f'/%3E%3Crect x='0' y='12' width='32' height='1' fill='%233c3752'/%3E%3Crect x='0' y='3' width='1' height='8' fill='%2317151f'/%3E%3Crect x='16' y='12' width='1' height='9' fill='%2317151f'/%3E%3Crect x='7' y='6' width='2' height='1' fill='%2324212f'/%3E%3Crect x='22' y='8' width='1' height='1' fill='%2324212f'/%3E%3Crect x='10' y='16' width='1' height='1' fill='%2324212f'/%3E%3Crect x='26' y='17' width='2' height='1' fill='%2324212f'/%3E%3Crect x='4' y='18' width='1' height='1' fill='%233a3550'/%3E%3C/svg%3E");
+  --torch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Crect x='4' y='19' width='4' height='3' fill='%233a3a48'/%3E%3Crect x='5' y='11' width='2' height='9' fill='%236b4226'/%3E%3Crect x='5' y='11' width='1' height='9' fill='%238b5a2b'/%3E%3Crect x='3' y='9' width='6' height='2' fill='%236b6b7a'/%3E%3Crect x='4' y='11' width='4' height='1' fill='%234b4b5a'/%3E%3Crect x='4' y='4' width='4' height='5' fill='%23ff7b00'/%3E%3Crect x='3' y='6' width='6' height='3' fill='%23ff7b00'/%3E%3Crect x='5' y='2' width='2' height='2' fill='%23ff9a1f'/%3E%3Crect x='5' y='5' width='2' height='4' fill='%23ffd23f'/%3E%3Crect x='5' y='7' width='2' height='1' fill='%23fff3b0'/%3E%3Crect x='16' y='19' width='4' height='3' fill='%233a3a48'/%3E%3Crect x='17' y='11' width='2' height='9' fill='%236b4226'/%3E%3Crect x='17' y='11' width='1' height='9' fill='%238b5a2b'/%3E%3Crect x='15' y='9' width='6' height='2' fill='%236b6b7a'/%3E%3Crect x='16' y='11' width='4' height='1' fill='%234b4b5a'/%3E%3Crect x='16' y='3' width='4' height='6' fill='%23ff7b00'/%3E%3Crect x='15' y='6' width='6' height='3' fill='%23ff7b00'/%3E%3Crect x='18' y='1' width='2' height='2' fill='%23ff9a1f'/%3E%3Crect x='17' y='4' width='2' height='5' fill='%23ffd23f'/%3E%3Crect x='17' y='7' width='2' height='1' fill='%23fff3b0'/%3E%3C/svg%3E");
 }
 
 * { box-sizing: border-box; }
@@ -33,9 +35,11 @@ body {
   font-size: 18px;
   color: var(--text);
   background:
-    var(--stars) 0 0 / 192px 192px,
-    linear-gradient(180deg, #0c0920 0 22%, #130f33 22% 44%, #1b1548 44% 64%, #241b5e 64% 82%, #2f2272 82%) fixed;
-  background-color: #0c0920;
+    radial-gradient(ellipse at 50% 42%, transparent 30%, rgba(5, 3, 12, .78) 100%) fixed,
+    radial-gradient(circle at 32px 150px, rgba(255, 150, 50, .28), transparent 240px) fixed,
+    radial-gradient(circle at calc(100% - 32px) 150px, rgba(255, 150, 50, .28), transparent 240px) fixed,
+    var(--bricks) 0 0 / 128px 64px fixed;
+  background-color: #15131d;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: none;
   font-variant-ligatures: none;
@@ -49,7 +53,19 @@ h1, h2, h3 { font-family: var(--pixel); font-weight: 400; line-height: 1.4; lett
 h1 { font-size: 1.6rem; } h2 { font-size: 1.05rem; } h3 { font-size: .85rem; }
 
 .screen { display: none; }
-.screen.active { display: flex; }
+.screen.active { display: flex; position: relative; z-index: 1; }
+
+/* Wall torches (flicker between two pixel frames) */
+body::before, body::after {
+  content: ''; position: fixed; top: 102px; width: 48px; height: 96px; z-index: 0; pointer-events: none;
+  background: var(--torch) 0 0 / 96px 96px no-repeat;
+  filter: drop-shadow(0 0 14px rgba(255, 140, 0, .75));
+  animation: flicker .5s steps(2) infinite;
+}
+body::before { left: 8px; }
+body::after { right: 8px; animation-delay: -.25s; }
+@keyframes flicker { to { background-position: -96px 0; } }
+@media (max-width: 760px) { body::before, body::after { display: none; } }
 
 /* ---------- Buttons, inputs, panels ---------- */
 .btn {
@@ -186,7 +202,7 @@ textarea.input { min-height: 140px; font-size: .95rem; }
 
 .arena {
   flex: 1; display: grid; grid-template-rows: auto 1fr auto; min-height: 0; padding: 16px 22px 0; gap: 10px;
-  background: linear-gradient(to top, #4a3220 0 74px, #2e7d32 74px 80px, #4caf50 80px 88px, transparent 88px);
+  background: var(--floor) left bottom / 128px 84px repeat-x;
 }
 .hp-wrap { display: flex; align-items: center; gap: 16px; }
 .hp-name { font-family: var(--pixel); font-size: .95rem; white-space: nowrap; text-shadow: 3px 3px 0 var(--ink); }
