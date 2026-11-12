@@ -46,6 +46,17 @@ function onMsg(m) {
   if (!m || typeof m !== 'object') return;
   if (m.t === 'join') handleJoin(m);
   else if (m.t === 'ans') handleAns(m);
+  else if (m.t === 'sync') resync();
+}
+
+// A student's iPad thinks it missed an update (e.g. it fell asleep). Resend the state,
+// but at most once every 1.5 seconds even if many ask at once.
+let lastResync = 0;
+function resync() {
+  const now = performance.now();
+  if (now - lastResync < 1500) return;
+  lastResync = now;
+  broadcast();
 }
 
 function handleJoin(m) {
@@ -62,9 +73,9 @@ function handleJoin(m) {
     G.players.set(id, p);
     sfx('join');
   } else { p.name = name; p.av = normalizeAvatar(m.av); }
-  send({ t: 'joined', to: id, ok: true, name });
+  // One message carries both the welcome and the current game state.
+  send({ t: 'joined', to: id, ok: true, name, state: stateMsg() });
   renderRoster(); renderParty();
-  send(stateMsg());
 }
 
 function handleAns(m) {
@@ -252,7 +263,6 @@ function nextQuestion() {
     lastSec = sec;
     if (remain <= 0) endQuestion();
   }, 100);
-  G.timers.push(setInterval(broadcast, 2000));
 
   // Test bots answer after a random delay.
   for (const p of G.players.values()) {
@@ -497,7 +507,7 @@ window.addEventListener('resize', () => { if (G.phase !== 'lobby') renderParty()
   setupLobby();
   show('lobbyScreen');
   try {
-    net = await openRoom(code, onMsg);
+    net = await openRoom(code, onMsg, 'host');
   } catch (e) {
     console.error(e);
     fail('Could not connect to the game server. Check the internet connection and the Supabase settings in js/config.js, then reload.');

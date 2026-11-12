@@ -72,15 +72,26 @@ $('#optGroups').addEventListener('click', e => {
 $('#randomize').onclick = () => { profile.av = randomAvatar(); renderBuilder(); };
 
 // ---------------- Networking ----------------
-const send = m => { try { net && net.send(m); } catch (e) { console.warn(e); } };
-const sendJoin = () => send({ t: 'join', id: pid, name: profile.name, av: profile.av });
+// Messages from a student go only to the projector (host), not to every iPad.
+const toHost = (m, opts) => {
+  try { const r = net && net.toHost(m, opts); if (r && r.catch) r.catch(e => console.warn(e)); } catch (e) { console.warn(e); }
+};
+const sendJoin = (viaRoom = false) => toHost({ t: 'join', id: pid, name: profile.name, av: profile.av }, { viaRoom });
+
+// If an update seems to be missing (e.g. the iPad dozed off), politely ask the host to resend.
+let lastSync = 0;
+setInterval(() => {
+  if (!joined || !last || last.phase !== 'question') return;
+  const now = performance.now();
+  if (now > deadline + 4000 && now - lastSync > 5000) { lastSync = now; toHost({ t: 'sync' }); }
+}, 1000);
 
 async function connect() {
   show('s-connecting');
   joined = false; shownKey = null; last = null; myAns = -1;
   try {
     if (net && netCode !== code) { net.close(); net = null; }
-    if (!net) { net = await openRoom(code, onMsg); netCode = code; }
+    if (!net) { net = await openRoom(code, onMsg, 'player'); netCode = code; }
   } catch (e) {
     console.error(e);
     return message('Could not connect. Check your internet and try again.');
@@ -96,7 +107,9 @@ async function connect() {
       show('s-join');
       return;
     }
-    sendJoin();
+    // No reply through the inbox, so switch to the always-works room channel.
+    net.useRoomForHost();
+    sendJoin(true);
   }, 2000);
   keepAwake();
 }
@@ -110,6 +123,7 @@ function onMsg(m) {
     clearInterval(joinTimer);
     if (m.ok) {
       joined = true;
+      if (m.state) last = m.state;
       render(last || { phase: 'lobby' });
     } else if (m.reason === 'kicked') {
       joined = false; message('Your teacher removed you from this game.');
@@ -187,7 +201,7 @@ $('#pChoices').addEventListener('click', e => {
   const b = e.target.closest('.choice');
   if (!b || !last || last.phase !== 'question' || myAns === last.qi) return;
   myAns = last.qi;
-  send({ t: 'ans', id: pid, q: last.qi, c: +b.dataset.c });
+  toHost({ t: 'ans', id: pid, q: last.qi, c: +b.dataset.c });
   shownKey = last.phase + ':' + last.qi + ':locked';
   showLocked();
 });
