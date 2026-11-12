@@ -52,8 +52,30 @@ The code lives at https://github.com/seanagain/wiserealm.
 1. In the repo on GitHub, go to **Settings → Pages**.
 2. Under "Build and deployment", choose **Deploy from a branch**, then the `main` branch and `/ (root)` folder. Click **Save**.
 3. After a minute or two your site is live:
-   - Students go to **https://seanagain.github.io/wiserealm/** (or scan the QR code on the projector).
-   - You go to **https://seanagain.github.io/wiserealm/teacher.html**.
+   - Students go to **https://wiserealm.org** (or scan the QR code on the projector).
+   - You go to **https://wiserealm.org/teacher.html**.
+
+### Custom domain: wiserealm.org
+The `CNAME` file in this repo tells GitHub Pages to serve the site at `wiserealm.org`.
+At your domain registrar's DNS settings, add these records (delete any existing "parking" A/CNAME records for `@` and `www` first):
+
+| Type | Host / Name | Value |
+|---|---|---|
+| A | @ | 185.199.108.153 |
+| A | @ | 185.199.109.153 |
+| A | @ | 185.199.110.153 |
+| A | @ | 185.199.111.153 |
+| AAAA | @ | 2606:50c0:8000::153 |
+| AAAA | @ | 2606:50c0:8001::153 |
+| AAAA | @ | 2606:50c0:8002::153 |
+| AAAA | @ | 2606:50c0:8003::153 |
+| CNAME | www | seanagain.github.io |
+
+Then in the repo's **Settings → Pages**, make sure **Custom domain** shows `wiserealm.org`, wait for the
+DNS check to pass, and tick **Enforce HTTPS**. DNS changes can take from a few minutes up to 24 hours.
+
+Recommended: verify the domain in your GitHub account (**Settings → Pages → Add a domain**, under your
+profile settings, not the repo) so no one else can ever point it at their own GitHub site.
 
 Any change pushed to the `main` branch updates the live site automatically.
 
