@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassQuest · Teacher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<section id="lib" class="screen teacher active">
+  <div class="topbar">
+    <div class="logo">Class<span>Quest</span> <span class="muted" style="font-size:1rem;font-weight:500">Teacher</span></div>
+    <div class="flex">
+      <button class="btn" id="importBtn">Restore backup</button>
+      <button class="btn" id="exportBtn">Download backup</button>
+      <button class="btn primary" id="newBtn">+ New question set</button>
+    </div>
+  </div>
+  <div id="modeBanner" class="banner"></div>
+  <div class="set-grid" id="setGrid"></div>
+  <p class="muted help">Your question sets are saved in this browser on this computer. Use <b>Download backup</b> now and then to keep a copy, or to move your sets to another computer.</p>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+</section>
+
+<section id="edit" class="screen teacher">
+  <div class="topbar">
+    <button class="btn" id="backBtn">← All sets</button>
+    <div class="flex">
+      <span class="muted" id="saveState">Saved</span>
+      <button class="btn primary" id="playFromEdit">⚔ Play Boss Raid</button>
+    </div>
+  </div>
+  <input class="input" id="titleInput" placeholder="Set title, e.g. Unit 3 Vocabulary" style="font-size:1.5rem;font-weight:600">
+
+  <div class="card" style="padding:18px">
+    <div class="flex"><h3 style="margin:0">Paste from a spreadsheet</h3><span class="spacer"></span><span class="muted" id="pasteInfo"></span></div>
+    <p class="help muted" style="margin:8px 0 12px">
+      In Google Sheets (or a Flippity sheet), select your cells and copy them (⌘C / Ctrl+C), then paste here.
+      Column 1 is the <b>question or word</b>, column 2 is the <b>correct answer or definition</b>.
+      Any extra columns are treated as <b>wrong answers</b>. With only two columns, the game borrows the other answers as wrong choices.
+      You can also type one per line like <code>word - definition</code>.
+    </p>
+    <textarea class="input" id="pasteBox" placeholder="Front	Back&#10;Erosion	The movement of rock and soil by wind, water, or ice&#10;Magma	Melted rock beneath Earth's surface"></textarea>
+    <div class="flex" style="margin-top:10px">
+      <button class="btn primary" id="pasteAdd">Add these rows</button>
+      <label class="flex muted"><input type="checkbox" id="pasteReplace"> Replace existing rows</label>
+    </div>
+  </div>
+
+  <div class="card" style="padding:18px">
+    <div class="flex" style="margin-bottom:8px"><h3 style="margin:0">Questions <span class="muted" id="countLbl"></span></h3></div>
+    <div class="table-wrap">
+      <table class="editor-table">
+        <thead><tr><th></th><th>Question / Word</th><th>Correct answer / Definition</th><th>Wrong answer (optional)</th><th>Wrong answer</th><th>Wrong answer</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <button class="btn" id="addRow" style="margin-top:10px">+ Add a question</button>
+  </div>
+  <button class="btn danger" id="deleteSet" style="align-self:flex-start">Delete this set</button>
+</section>
+
+<script type="module" src="js/teacher.js"></script>
+</body>
+</html>

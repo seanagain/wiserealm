@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassQuest · Boss Raid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<section id="errScreen" class="screen end">
+  <h1>Hmm…</h1>
+  <p id="errMsg" class="muted" style="font-size:1.2rem"></p>
+  <a class="btn" href="teacher.html">← Back to question sets</a>
+</section>
+
+<section id="lobbyScreen" class="screen host">
+  <div class="host-bar">
+    <div class="logo">Class<span>Quest</span></div>
+    <div class="muted">Boss Raid · <span class="set-title"></span></div>
+    <span class="spacer"></span>
+    <button class="btn small mute-btn"></button>
+    <button class="btn small fs-btn">⛶ Full screen</button>
+    <a class="btn small" href="teacher.html">Exit</a>
+  </div>
+  <div class="lobby">
+    <div class="card" style="display:flex;flex-direction:column;min-height:0">
+      <div class="join-panel">
+        <div class="join-row">
+          <div>
+            <div class="join-url">Join at <b id="joinUrl"></b></div>
+            <div class="muted" style="font-size:1.2rem;margin-top:6px">Game code</div>
+            <div class="join-code" id="joinCode">-----</div>
+          </div>
+          <div class="qr" id="qr" hidden></div>
+        </div>
+        <div id="localNote" class="banner" hidden>🧪 Local Test Mode: only tabs in this browser can join. Use the testing buttons on the right.</div>
+      </div>
+      <h2 style="text-align:center;margin:0 0 4px"><span id="playerCount">0</span> heroes ready</h2>
+      <p class="muted" style="text-align:center;margin:0 0 6px;font-size:.9rem">Click a hero to remove them.</p>
+      <div class="roster" id="roster"></div>
+    </div>
+    <div class="card side">
+      <h3 style="margin:0">Game settings</h3>
+      <label>Time per question <select id="setTime">
+        <option value="10">10 sec</option><option value="15">15 sec</option><option value="20">20 sec</option>
+        <option value="30">30 sec</option><option value="45">45 sec</option><option value="60">60 sec</option><option value="90">90 sec</option>
+      </select></label>
+      <label>Questions <select id="setCount"></select></label>
+      <label title="For word / definition sets">Flip vocab cards <input type="checkbox" id="setFlip"></label>
+      <p class="muted" style="margin:-6px 0 0;font-size:.82rem">Flipped: show the definition, pick the word.</p>
+      <label>Auto-advance <input type="checkbox" id="setAuto"></label>
+      <div>
+        <div style="margin-bottom:6px">Boss</div>
+        <div class="boss-pick" id="bossPick"></div>
+        <div class="muted" id="bossName" style="font-size:.85rem;margin-top:4px"></div>
+      </div>
+      <hr>
+      <div class="muted" style="font-size:.85rem">Testing tools</div>
+      <div class="flex">
+        <button class="btn small" id="addBots">+ Add 5 test bots</button>
+        <button class="btn small" id="openStudent">Open a test student</button>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn primary big" id="startBtn">⚔ Start battle</button>
+    </div>
+  </div>
+</section>
+
+<section id="battleScreen" class="screen host">
+  <div class="host-bar">
+    <div class="logo">Class<span>Quest</span></div>
+    <div class="title" id="qCounter"></div>
+    <span class="spacer"></span>
+    <div class="muted">Code <b id="smallCode"></b></div>
+    <button class="btn small mute-btn"></button>
+    <button class="btn small fs-btn">⛶</button>
+    <button class="btn small danger" id="endEarly">End game</button>
+  </div>
+  <div class="arena">
+    <div class="hp-wrap">
+      <div class="hp-name" id="bossTitle"></div>
+      <div class="hp-bar"><div class="hp-ghost" id="hpGhost"></div><div class="hp-fill" id="hpFill"></div><div class="hp-text" id="hpText"></div></div>
+    </div>
+    <div class="battle">
+      <div class="boss-area" id="bossArea"><div class="boss" id="boss"></div></div>
+      <div class="qpanel" id="qpanel">
+        <div class="card qcard">
+          <div class="ring" id="ring">
+            <svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" stroke="rgba(255,255,255,.15)" stroke-width="8" fill="none"/>
+            <circle id="ringFg" cx="42" cy="42" r="36" stroke="#ffd166" stroke-width="8" fill="none" stroke-linecap="round" stroke-dasharray="226.2" stroke-dashoffset="0"/></svg>
+            <span id="ringNum"></span>
+          </div>
+          <div class="qtext" id="qText"></div>
+        </div>
+        <div class="h-choices" id="hChoices"></div>
+        <div class="flex">
+          <div class="status-line" id="statusLine"></div>
+          <div class="round-msg" id="roundMsg"></div>
+          <span class="spacer"></span>
+          <button class="btn" id="skipBtn">Stop timer</button>
+          <button class="btn primary big" id="nextBtn" hidden>Next ▶</button>
+        </div>
+      </div>
+    </div>
+    <div class="party" id="party"></div>
+  </div>
+</section>
+
+<section id="endScreen" class="screen host">
+  <div class="host-bar">
+    <div class="logo">Class<span>Quest</span></div>
+    <span class="spacer"></span>
+    <button class="btn small mute-btn"></button>
+  </div>
+  <div class="end" style="display:flex">
+    <h1 id="endTitle"></h1>
+    <div class="muted" id="endSub" style="font-size:1.3rem"></div>
+    <div class="podium" id="podium"></div>
+    <div class="stat-row" id="endList"></div>
+    <div class="flex" style="justify-content:center">
+      <button class="btn primary big" id="againBtn">Play again</button>
+      <a class="btn big" href="teacher.html">Done</a>
+    </div>
+  </div>
+</section>
+
+<div class="overlay" id="intro"><div class="intro-text" id="introText"></div></div>
+
+<script type="module" src="js/host.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ClassQuest">
+<meta name="theme-color" content="#1b1446">
+<title>ClassQuest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<section id="s-join" class="screen play active">
+  <div class="logo" style="font-size:2.4rem">Class<span>Quest</span></div>
+  <div class="card box">
+    <label class="muted" for="codeIn">Game code</label>
+    <input class="input code-input" id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="12345">
+    <label class="muted" for="nameIn">Your name</label>
+    <input class="input" id="nameIn" maxlength="16" autocomplete="off" autocapitalize="words" placeholder="First name">
+    <div id="joinErr" style="color:var(--bad);min-height:1.2em"></div>
+    <button class="btn primary big" id="toAvatar">Next ▶</button>
+  </div>
+  <a class="muted" href="teacher.html" style="font-size:.85rem">Teacher? Go to the teacher page</a>
+</section>
+
+<section id="s-avatar" class="screen play">
+  <h2 style="margin:0">Create your hero</h2>
+  <div class="card builder" style="padding:18px">
+    <div>
+      <div class="preview" id="preview"></div>
+      <div style="text-align:center;margin-top:8px"><button class="btn small" id="randomize">🎲 Surprise me</button></div>
+    </div>
+    <div id="optGroups"></div>
+  </div>
+  <div class="flex" style="justify-content:center">
+    <button class="btn" id="backToJoin">◀ Back</button>
+    <button class="btn primary big" id="joinBtn">⚔ Join game</button>
+  </div>
+</section>
+
+<section id="s-connecting" class="screen play">
+  <div class="spinner"></div>
+  <h2 style="margin:0">Joining game…</h2>
+</section>
+
+<section id="s-wait" class="screen play">
+  <div class="hero-big" id="waitHero"></div>
+  <h1 style="margin:0" id="waitName"></h1>
+  <h2 style="margin:0" id="waitTitle">You’re in!</h2>
+  <p class="muted" id="waitSub" style="font-size:1.15rem;margin:0">Look at the big screen. Your teacher will start soon.</p>
+</section>
+
+<section id="s-question" class="screen play q-screen">
+  <div class="q-top"><span id="qNum"></span><span id="qBoss"></span><span id="qDmg"></span></div>
+  <div class="timer-bar"><div id="tBar"></div></div>
+  <div class="card q-prompt" id="qPrompt"></div>
+  <div class="p-choices" id="pChoices"></div>
+</section>
+
+<section id="s-locked" class="screen play">
+  <div class="hero-big" id="lockHero"></div>
+  <h2 style="margin:0">Answer locked in!</h2>
+  <p class="muted" style="margin:0;font-size:1.1rem">Waiting for the rest of your team…</p>
+</section>
+
+<section id="s-result" class="screen play">
+  <div class="hero-big" id="resHero" style="animation:none"></div>
+  <p class="result-big" id="resTitle"></p>
+  <div id="resSub" style="font-size:1.25rem"></div>
+  <div class="stat-row">
+    <div class="card stat">Your damage<b id="resDmg"></b></div>
+    <div class="card stat">Correct<b id="resCorrect"></b></div>
+  </div>
+  <p class="muted" id="resNote" style="margin:0"></p>
+</section>
+
+<section id="s-end" class="screen play">
+  <div class="hero-big" id="endHero"></div>
+  <p class="result-big" id="endTitle"></p>
+  <div id="endSub" style="font-size:1.25rem"></div>
+  <div class="stat-row">
+    <div class="card stat">Your rank<b id="endRank"></b></div>
+    <div class="card stat">Damage<b id="endDmg"></b></div>
+    <div class="card stat">Correct<b id="endCorrect"></b></div>
+  </div>
+  <p class="muted">Great job, hero! Stay here, your teacher might start another round.</p>
+</section>
+
+<section id="s-msg" class="screen play">
+  <h2 id="msgText" style="margin:0"></h2>
+  <button class="btn primary" id="msgBtn">OK</button>
+</section>
+
+<script type="module" src="js/play.js"></script>
+</body>
+</html>
