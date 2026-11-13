@@ -7,7 +7,59 @@ export const BOSSES = [
   { name: 'Magmaw the Molten', body: '#ff7a45', belly: '#ffd08a', horn: '#5c2b1d' },
   { name: 'Frostfang the Glacier Wyrm', body: '#4cc9f0', belly: '#e3f8ff', horn: '#f8f9fa' },
   { name: 'Umbrax of the Void', body: '#8e44ad', belly: '#d7a6f5', horn: '#ff4d6d' },
+  { name: 'Mr. C, Lord of Pop Quizzes', custom: 'mrc' },
 ];
+
+// ---------- Mr. C (the teacher!) ----------
+const MRC_ROWS = [
+  '................................',
+  '..........KKKKKKKKKKKK..........',
+  '........KKHHHHHHHHHHHHKK........',
+  '.......KHHHhlHHHHHHHHHHHK.......',
+  '......KHHHhllHHHHHHHHHHHHK......',
+  '......KHHhHHHHHHHHHHHHHHHK......',
+  '......KHhSSSSSHHHHHHHHHHHK......',
+  '......KHSSSSSSSSSSHHHHHHHK......',
+  '......KHSSSSSSSSSSSSSHHHHK......',
+  '......KHSSSSSSSSSSSSSSSSHK......',
+  '......KSSGGGGGGSSGGGGGGSSK......',
+  '......KSSGgEESGGGGgEESGSSK......',
+  '......KSSGESSEGssGESSEGSSK......',
+  '......KSSGGGGGGssGGGGGGSSK......',
+  '......KSSrrSSSSssSSSSrrSSK......',
+  '......KSSSMMMMMMMMMMMMSSSK......',
+  '......KSSSMWWWWWWWWWWMSSSK......',
+  '......KSSSSMMMMMMMMMMSSSSK......',
+  '.......KSSSSSSSSSSSSSSSSK.......',
+  '........KKSSSSSSSSSSSSKK........',
+  '..........KKSSSSSSSSKK..........',
+  '.....KJJJJJcBLBTTBBBcJJJJJK.....',
+  '....KJJJJJccBLBTtBBBccJJJJJK....',
+  '...KJJJJJJcjBLTtTTBBjcJJJJJJK...',
+  '...KJJJJJJJjBLTTtTBBjJJJJJJJK...',
+  '...KJJJJJJJjBLtTTtBBjJJJJJJJK...',
+  '...KJJJJJJJjBLTtTTBBjJJJJJJJK...',
+  '...KKKKKKKKKKKKKKKKKKKKKKKKKK...',
+];
+
+function mrcSVG() {
+  const pal = {
+    K: '#1a1226', H: '#8a5a32', h: '#5e3b1f', l: '#b98250', S: '#f2c8a8', s: '#d9a585', r: '#f09a8a',
+    G: '#2a1f1f', g: '#cfe6ff', E: '#1a1226', W: '#ffffff', M: '#5a1a22',
+    J: '#7a6a45', j: '#5a4d30', c: '#4f4428', B: '#b8d4f0', T: '#d0545a', t: '#f6d6dc', L: '#1f2a4a',
+  };
+  const g = makeGrid(32, 28);
+  paint(g, { rows: MRC_ROWS }, pal);
+  // ears
+  dots(g, [[5, 10], [5, 11], [5, 12], [26, 10], [26, 11], [26, 12]], pal.S);
+  dots(g, [[4, 10], [4, 11], [4, 12], [5, 9], [5, 13], [27, 10], [27, 11], [27, 12], [26, 9], [26, 13]], pal.K);
+  const brows = makeGrid(32, 28);
+  dots(brows, [[9, 8], [10, 8], [11, 9], [12, 9], [13, 9], [22, 8], [21, 8], [20, 9], [19, 9], [18, 9]], pal.h);
+  const sweat = makeGrid(32, 28);
+  dots(sweat, [[28, 6], [27, 7], [28, 7], [29, 7], [28, 8], [3, 9], [3, 10]], '#8fd8ff');
+  return `<svg class="boss-svg" viewBox="0 0 32 28" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+${gridRects(g)}<g class="brows">${gridRects(brows)}</g><g class="sweat">${gridRects(sweat)}</g></svg>`;
+}
 
 const LEFT = [
   '................',
@@ -44,6 +96,7 @@ const mirror = list => list.flatMap(([x, y]) => [[x, y], [31 - x, y]]);
 
 export function bossSVG(i) {
   const b = BOSSES[i] || BOSSES[0];
+  if (b.custom === 'mrc') return mrcSVG();
   const pal = {
     K: '#140f22', B: b.body, b: shade(b.body, -0.25), A: shade(b.body, -0.15), H: b.horn,
     L: b.belly, W: '#ffffff', P: '#140f22', M: '#3a0d1a', T: '#ffffff', o: 'rgba(0,0,0,.3)',

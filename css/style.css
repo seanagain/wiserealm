@@ -196,7 +196,7 @@ textarea.input { min-height: 140px; font-size: .95rem; }
 .side select { background: #0f0c22; border: 2px solid var(--ink); border-radius: 0; padding: 6px 8px; box-shadow: 0 0 0 1px var(--line); }
 .side input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--gold); }
 .side hr { border: 0; border-top: 3px dashed var(--line); width: 100%; margin: 4px 0; }
-.boss-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.boss-pick { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .boss-pick button { background: #0f0c22; border: 3px solid var(--ink); border-radius: 0; padding: 6px; aspect-ratio: 1; box-shadow: 0 0 0 1px var(--line); }
 .boss-pick button.sel { outline: 3px solid var(--gold); outline-offset: 2px; }
 
