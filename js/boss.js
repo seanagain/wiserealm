@@ -12,35 +12,34 @@ export const BOSSES = [
 
 // ---------- Mr. C (the teacher!) ----------
 const MRC_ROWS = [
-  '.............K....K..K..........',
-  '..........KKKHKKKKHKKHKK........',
-  '........KKHHHHHHHHHHHHKK........',
-  '.......KHHHHHHHHHllHHHHHK.......',
-  '......KHHHHHHHllHHHHHHHHHK......',
-  '......KHHHHHhhHHHHHHHHHHHK......',
-  '......KHHHHHHHHHHHSSSSSSHK......',
-  '......KHHHHHHHhSSSSSSSSSHK......',
-  '......KHHHhSSSSSSSSSSSSSHK......',
-  '......KHSSSSSSSSSSSSSSSSHK......',
-  '......KSSSGGGGSSSSGGGGSSSK......',
-  '......KGGGgEESGGGGgEESGGGK......',
-  '......KSSGESSEGssGESSEGSSK......',
-  '......KSSSGGGGSssSGGGGSSSK......',
-  '......KSSrrSSSSssSSSSrrSSK......',
-  '......KSSSMMMMMMMMMMMMSSSK......',
-  '......KSSSMWWWWWWWWWWMSSSK......',
-  '......KSSSSMMMMMMMMMMSSSSKKK.KK.',
-  '.......KSSSSSSSSSSSSSSSSKKSSKSSK',
-  '........KKSSSSSSSSSSSSKK.KSSKSSK',
-  '..........KKSSSSSSSSKK...KSSKSSK',
-  '.....KBwBbWWWSSSSSSWWWPPBKSSSSSK',
-  '....KwBwBwbWWWSSSSWWWbPPBKSSSSSK',
-  '...KBwBwBwBwbWWSSWWbBwPPBKSsSSSK',
-  '...KBwBwBwBwBwBwkwBwBwPPBKSSSSSK',
-  '...KBwBwBwBwBwBwwwBwBwPPBwKSSSK.',
-  '...KBwBwBwBwBwBwkwBwBwPPBwBKKK..',
-  '...KKKKKKKKKKKKKKKKKKKKKKKKKK...'
-,
+  '.............K...K..K...........',
+  '...........KKHKKKHKKHK..........',
+  '.........KKHHHHHHHHHHKK.........',
+  '........KHHHHHHHHHllHHK.........',
+  '........KHHHHHHHllHHHHHK........',
+  '........KHHHHhhHHHHHHHHK........',
+  '........KHHHHHHHHHSSSSHK........',
+  '........KHHHHHHhSSSSSSHK........',
+  '........KHHhSSSSSSSSSSHK........',
+  '.......KKSGGGGSSSSGGGGSKK.......',
+  '......KSKGgSSSGGGGgSSSGKSK......',
+  '......KSKGSEESGssGSEESGKSK......',
+  '......KSKGESSEGssGESSEGKSK......',
+  '.......KKSGGGGSssSGGGGSKK.......',
+  '........KSrrSSSssSSSrrSK........',
+  '........KSSSMMMMMMMMSSSK........',
+  '........KSSSMWWWWWWMSSSK........',
+  '.........KSSSMMMMMMSSSK...KK.KK.',
+  '..........KSSSSSSSSSSK...KSSKSSK',
+  '...........KKSSSSSSKK....KSSKSSK',
+  '.............KSSSSK......KSSKSSK',
+  '.......KBwbWWWSSSSWWPPBwKKSSSSSK',
+  '......KwBwBbWWSSWWbwPPBwBKSSSSSK',
+  '.....KBwBwBwBbWWbwBwPPBwBKSsSSSK',
+  '.....KBwBwBwBwBwkwBwPPBwBKSSSSSK',
+  '.....KBwBwBwBwBwwwBwPPBwBwKSSSK.',
+  '.....KBwBwBwBwBwkwBwPPBwBwKKKK..',
+  '.....KKKKKKKKKKKKKKKKKKKKKK.....',
 ];
 
 function mrcSVG() {
@@ -51,13 +50,10 @@ function mrcSVG() {
   };
   const g = makeGrid(32, 28);
   paint(g, { rows: MRC_ROWS }, pal);
-  // ears
-  dots(g, [[5, 10], [5, 11], [5, 12], [26, 10], [26, 11], [26, 12]], pal.S);
-  dots(g, [[4, 10], [4, 11], [4, 12], [5, 9], [5, 13], [27, 10], [27, 11], [27, 12], [26, 9], [26, 13]], pal.K);
   const brows = makeGrid(32, 28);
-  dots(brows, [[9, 8], [10, 8], [11, 9], [12, 9], [13, 9], [22, 8], [21, 8], [20, 9], [19, 9], [18, 9]], pal.h);
+  dots(brows, [[10, 8], [11, 8], [12, 8], [13, 7], [21, 7], [20, 8], [19, 8], [18, 8]], pal.h);
   const sweat = makeGrid(32, 28);
-  dots(sweat, [[28, 6], [27, 7], [28, 7], [29, 7], [28, 8], [3, 9], [3, 10]], '#8fd8ff');
+  dots(sweat, [[27, 5], [26, 6], [27, 6], [28, 6], [27, 7], [4, 8], [4, 9]], '#8fd8ff');
   return `<svg class="boss-svg" viewBox="0 0 32 28" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 ${gridRects(g)}<g class="brows">${gridRects(brows)}</g><g class="sweat">${gridRects(sweat)}</g></svg>`;
 }
