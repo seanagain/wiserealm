@@ -3,7 +3,7 @@
 import { $, $$, esc, fmt } from './common.js';
 import { accounts } from './supa.js';
 import { ITEMS, ITEM_BY_ID, SLOTS } from './items.js';
-import { avatarSVG, normalizeAvatar, restrictAvatar, SKINS, COLORS, HATS, FACES, CLASSES } from './avatar.js';
+import { avatarSVG, normalizeAvatar, restrictAvatar, SKINS, COLORS, HATS, FACES, CLASSES, STYLES } from './avatar.js';
 
 let prof = null;      // saved profile from the server
 let draft = null;     // the hero being edited (may include items being tried on)
@@ -11,7 +11,8 @@ let tab = 'look';
 
 const FREE = [
   { key: 'cls', title: 'Hero class', items: CLASSES.map(c => c.label) },
-  { key: 'color', title: 'Outfit color', swatch: COLORS },
+  { key: 'style', title: 'Outfit', items: STYLES.map(st => st.label) },
+  { key: 'color', title: 'Adventurer outfit color', swatch: COLORS },
   { key: 'skin', title: 'Skin tone', swatch: SKINS },
   { key: 'hat', title: 'Hair / hat (free)', items: HATS.map(h => h.label) },
   { key: 'hc', title: 'Hair / hat color', swatch: COLORS },

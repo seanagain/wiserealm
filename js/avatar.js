@@ -13,8 +13,16 @@ export const COLORS = ['#e63946', '#f4845f', '#ffd23f', '#3ddc84', '#2ec4b6', '#
 export const HATS = [
   { id: 'hair', label: 'Hair' }, { id: 'cap', label: 'Cap' }, { id: 'beanie', label: 'Beanie' },
   { id: 'wizard', label: 'Wizard' }, { id: 'crown', label: 'Crown' }, { id: 'headphones', label: 'Headphones' },
-  { id: 'helmet', label: 'Helmet' }, { id: 'horns', label: 'Horns' },
+  { id: 'helmet', label: 'Helmet' }, { id: 'horns', label: 'Horns' }, { id: 'long', label: 'Long hair' },
 ];
+// Outfit styles. The two uniforms match the school's striped PE uniform; labels are
+// colors only, so every student can pick whichever they like.
+export const STYLES = [
+  { id: 'adventurer', label: 'Adventurer' },
+  { id: 'uniform_red', label: 'Uniform · Red & Gold', pal: { A: '#c0283f', Y: '#f2c230', P: '#b5203b', p: '#8c1830' } },
+  { id: 'uniform_navy', label: 'Uniform · Navy & Gold', pal: { A: '#25336b', Y: '#f2c230', P: '#2b3a6e', p: '#1c264d' } },
+];
+
 export const FACES = [
   { id: 'smile', label: 'Smile' }, { id: 'grin', label: 'Grin' }, { id: 'cool', label: 'Shades' },
   { id: 'wink', label: 'Wink' }, { id: 'focused', label: 'Focused' },
@@ -27,13 +35,13 @@ export const CLASSES = [
 const pick = a => Math.floor(Math.random() * a.length);
 
 export function randomAvatar() {
-  return { cls: pick(CLASSES), color: pick(COLORS), skin: pick(SKINS), hat: pick(HATS), hc: pick(COLORS), face: pick(FACES) };
+  return { cls: pick(CLASSES), style: pick(STYLES), color: pick(COLORS), skin: pick(SKINS), hat: pick(HATS), hc: pick(COLORS), face: pick(FACES) };
 }
 
 export function normalizeAvatar(a) {
   a = a && typeof a === 'object' ? a : {};
   const n = (v, arr) => (Number.isInteger(v) && v >= 0 && v < arr.length ? v : 0);
-  const out = { cls: n(a.cls, CLASSES), color: n(a.color, COLORS), skin: n(a.skin, SKINS), hat: n(a.hat, HATS), hc: n(a.hc, COLORS), face: n(a.face, FACES) };
+  const out = { cls: n(a.cls, CLASSES), style: n(a.style, STYLES), color: n(a.color, COLORS), skin: n(a.skin, SKINS), hat: n(a.hat, HATS), hc: n(a.hc, COLORS), face: n(a.face, FACES) };
   for (const slot of PREMIUM_SLOTS) {
     const it = ITEM_BY_ID[a[slot]];
     out[slot] = it && it.slot === slot ? it.id : null;
@@ -123,6 +131,21 @@ const BASE = { y: 3, rows: [
   '....oooooooooo',
 ] };
 
+// Striped uniform shirt, shorts, bare legs and white sneakers (drawn over the base body).
+const UNIFORM = { y: 12, rows: [
+  '....KYYYYYYYYK',
+  '...KAAAAAAAAAAK',
+  '..KYKYYYYYYYYKYK',
+  '..KSKAAAAAAAAKSK',
+  '..KKKYYYYYYYYKKK',
+  '....KAAAAAAAAK',
+  '....KYYYYYYYYK',
+  '....KPPPPPPPPK',
+  '.....KPPK.KppK',
+  '.....KSSK.KSSK',
+  '.....KWWK.KWWK',
+] };
+
 const EYES = [[6, 7], [6, 8], [11, 7], [11, 8]];
 const BLUSH = [[5, 9], [12, 9]];
 const SMILE = [[7, 9], [10, 9], [8, 10], [9, 10]];
@@ -158,6 +181,20 @@ function drawFace(g, id) {
 }
 
 const HAT_LAYERS = {
+  long: { y: 2, rows: [
+    '.....KKKKKKKK',
+    '....KHHHHHHHHK',
+    '...KHHhHHHHHHHK',
+    '...KHH.....HHHK',
+    '...KH........HK',
+    '...KH........HK',
+    '...KH........HK',
+    '...KH........HK',
+    '...KHH......HHK',
+    '...KHHK....KHHK',
+    '...KHK......KHK',
+    '...KK........KK',
+  ] },
   hair: { y: 2, rows: [
     '.....KKKKKKKK',
     '....KHHHHHHHHK',
@@ -249,6 +286,8 @@ export function avatarSVG(a, extraClass = '') {
   const layer = (it, extra) => paint(g, it, Object.assign({}, pal, it.pal), it.abs ? 0 : OX);
   if (item('cape')) layer(item('cape'));
   paint(g, BASE, pal, OX);
+  const style = STYLES[a.style];
+  if (style.pal) paint(g, UNIFORM, Object.assign({}, pal, style.pal, { W: '#f4f4f4' }), OX);
   if (item('top')) layer(item('top'));
   if (item('cape') && item('cape').front) paint(g, item('cape').front, Object.assign({}, pal, item('cape').pal), OX);
   drawFace(g, FACES[a.face].id);

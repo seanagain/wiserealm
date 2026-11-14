@@ -4,7 +4,7 @@
 import { $, esc, show, uid, load, save, fmt, CHOICE_STYLE } from './common.js';
 import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
-import { avatarSVG, normalizeAvatar, restrictAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES } from './avatar.js';
+import { avatarSVG, normalizeAvatar, restrictAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES, STYLES } from './avatar.js';
 
 // One ID per device so a student who reloads keeps their score.
 // In Local Test Mode each tab is its own pretend student.
@@ -89,7 +89,8 @@ $('#msgBtn').onclick = () => show('s-join');
 // ---------------- Guest hero builder (free options only) ----------------
 const GROUPS = [
   { key: 'cls', title: 'Hero class', items: CLASSES.map(c => c.label) },
-  { key: 'color', title: 'Outfit color', swatch: COLORS },
+  { key: 'style', title: 'Outfit', items: STYLES.map(st => st.label) },
+  { key: 'color', title: 'Adventurer outfit color', swatch: COLORS },
   { key: 'skin', title: 'Skin tone', swatch: SKINS },
   { key: 'hat', title: 'Hair / hat', items: HATS.map(h => h.label) },
   { key: 'hc', title: 'Hair / hat color', swatch: COLORS },
