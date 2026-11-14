@@ -12,6 +12,7 @@
   <div class="topbar">
     <div class="logo">Wise<span>Realm</span> <span class="muted" style="font-size:1rem;font-weight:500">Teacher</span></div>
     <div class="flex">
+      <button class="btn" id="studentsBtn">🪙 Students &amp; coins</button>
       <button class="btn" id="importBtn">Restore backup</button>
       <button class="btn" id="exportBtn">Download backup</button>
       <button class="btn primary" id="newBtn">+ New question set</button>
@@ -28,7 +29,9 @@
     <button class="btn" id="backBtn">← All sets</button>
     <div class="flex">
       <span class="muted" id="saveState">Saved</span>
-      <button class="btn primary" id="playFromEdit">Play Boss Raid</button>
+      <button class="btn primary" data-play-edit="raid">Boss Raid</button>
+      <button class="btn primary" data-play-edit="corners">Four Corners</button>
+      <button class="btn primary" data-play-edit="treasure">Treasure Hunt</button>
     </div>
   </div>
   <input class="input" id="titleInput" placeholder="Set title, e.g. Unit 3 Vocabulary" style="font-size:1.5rem;font-weight:600">
@@ -59,6 +62,16 @@
     <button class="btn" id="addRow" style="margin-top:10px">+ Add a question</button>
   </div>
   <button class="btn danger" id="deleteSet" style="align-self:flex-start">Delete this set</button>
+</section>
+
+<section id="students" class="screen teacher">
+  <div class="topbar">
+    <button class="btn" id="studentsBack">← All sets</button>
+    <div class="flex"><a class="btn" href="shop.html">Open the shop</a></div>
+  </div>
+  <h2 style="margin:0">Students &amp; coins</h2>
+  <div class="card" style="padding:18px" id="teacherBox">Checking your account…</div>
+  <div class="card" style="padding:18px" id="studentList" hidden></div>
 </section>
 
 <script type="module" src="js/teacher.js"></script>

@@ -1,6 +1,12 @@
-// Pixel-art heroes, built from layered sprite maps (20 x 24 pixels).
+// Pixel-art heroes, built from layered sprite maps (20 x 24 pixel hero on a 26 x 24 canvas,
+// leaving room for a pet).
 // Each layer is a list of text rows; each character is one pixel ('.' = transparent).
 // Later steps add shop items as more layers.
+
+import { ITEM_BY_ID } from './items.js';
+
+export const PREMIUM_SLOTS = ['phat', 'top', 'cape', 'acc', 'pet'];
+export const CANVAS_W = 26, CANVAS_H = 24, OX = 3; // hero is drawn 3 pixels in from the left
 
 export const SKINS = ['#ffdcb8', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5c3a21'];
 export const COLORS = ['#e63946', '#f4845f', '#ffd23f', '#3ddc84', '#2ec4b6', '#1e88e5', '#4361ee', '#8e44ad', '#34344a', '#eeeeee', '#ff8fab', '#8d6346'];
@@ -27,7 +33,19 @@ export function randomAvatar() {
 export function normalizeAvatar(a) {
   a = a && typeof a === 'object' ? a : {};
   const n = (v, arr) => (Number.isInteger(v) && v >= 0 && v < arr.length ? v : 0);
-  return { cls: n(a.cls, CLASSES), color: n(a.color, COLORS), skin: n(a.skin, SKINS), hat: n(a.hat, HATS), hc: n(a.hc, COLORS), face: n(a.face, FACES) };
+  const out = { cls: n(a.cls, CLASSES), color: n(a.color, COLORS), skin: n(a.skin, SKINS), hat: n(a.hat, HATS), hc: n(a.hc, COLORS), face: n(a.face, FACES) };
+  for (const slot of PREMIUM_SLOTS) {
+    const it = ITEM_BY_ID[a[slot]];
+    out[slot] = it && it.slot === slot ? it.id : null;
+  }
+  return out;
+}
+
+// Only the items this hero is allowed to wear (e.g. items they own).
+export function restrictAvatar(a, owned) {
+  const out = normalizeAvatar(a);
+  for (const slot of PREMIUM_SLOTS) if (out[slot] && !owned.includes(out[slot])) out[slot] = null;
+  return out;
 }
 
 export function shade(hex, amt) {
@@ -43,8 +61,8 @@ export const avatarColor = a => COLORS[normalizeAvatar(a).color];
 // ---------- Tiny sprite engine (shared with boss.js) ----------
 export function makeGrid(w, h) { return Array.from({ length: h }, () => Array(w).fill(null)); }
 
-export function paint(grid, layer, pal) {
-  const y0 = layer.y || 0, x0 = layer.x || 0;
+export function paint(grid, layer, pal, dx0 = 0) {
+  const y0 = layer.y || 0, x0 = (layer.x || 0) + dx0;
   layer.rows.forEach((row, dy) => {
     for (let dx = 0; dx < row.length; dx++) {
       const col = pal[row[dx]];
@@ -54,8 +72,8 @@ export function paint(grid, layer, pal) {
   });
 }
 
-export function dots(grid, list, color) {
-  for (const [x, y] of list) if (grid[y] && x >= 0 && x < grid[y].length) grid[y][x] = color;
+export function dots(grid, list, color, dx = 0) {
+  for (const [x0, y] of list) { const x = x0 + dx; if (grid[y] && x >= 0 && x < grid[y].length) grid[y][x] = color; }
 }
 
 // Turns a pixel grid into SVG rectangles, merging runs of the same color in each row.
@@ -75,6 +93,8 @@ export function gridRects(grid) {
   });
   return out;
 }
+
+const dotsAt = (grid, list, color, dx) => dots(grid, list, color, dx);
 
 // ---------- Hero layers ----------
 const INK = '#1a1226';
@@ -107,8 +127,10 @@ const EYES = [[6, 7], [6, 8], [11, 7], [11, 8]];
 const BLUSH = [[5, 9], [12, 9]];
 const SMILE = [[7, 9], [10, 9], [8, 10], [9, 10]];
 
+// Face pixels are listed in hero space, so shift them onto the canvas.
 function drawFace(g, id) {
   const K = INK, R = '#ff8a8a';
+  const dots = (grid, list, color) => dotsAt(grid, list, color, OX);
   switch (id) {
     case 'grin':
       dots(g, [[5, 8], [6, 7], [7, 8], [10, 8], [11, 7], [12, 8]], K);
@@ -222,10 +244,19 @@ export function avatarSVG(a, extraClass = '') {
     M: '#e3e8ef', m: '#8b95a7', W: '#ffffff', w: '#8b5a2b', L: '#efe6d2', k: '#3a3a4a',
     R: '#e63946', o: 'rgba(0,0,0,.3)',
   };
-  const g = makeGrid(20, 24);
-  paint(g, BASE, pal);
+  const g = makeGrid(CANVAS_W, CANVAS_H);
+  const item = slot => ITEM_BY_ID[a[slot]];
+  const layer = (it, extra) => paint(g, it, Object.assign({}, pal, it.pal), it.abs ? 0 : OX);
+  if (item('cape')) layer(item('cape'));
+  paint(g, BASE, pal, OX);
+  if (item('top')) layer(item('top'));
+  if (item('cape') && item('cape').front) paint(g, item('cape').front, Object.assign({}, pal, item('cape').pal), OX);
   drawFace(g, FACES[a.face].id);
-  paint(g, HAT_LAYERS[HATS[a.hat].id], pal);
-  paint(g, WEAPON_LAYERS[CLASSES[a.cls].id], pal);
-  return `<svg class="av ${extraClass}" viewBox="0 0 20 24" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${gridRects(g)}</svg>`;
+  if (item('acc')) layer(item('acc'));
+  const ph = item('phat');
+  if (ph) { if (ph.withHair) paint(g, HAT_LAYERS.hair, pal, OX); layer(ph); }
+  else paint(g, HAT_LAYERS[HATS[a.hat].id], pal, OX);
+  paint(g, WEAPON_LAYERS[CLASSES[a.cls].id], pal, OX);
+  if (item('pet')) layer(item('pet'));
+  return `<svg class="av ${extraClass}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${gridRects(g)}</svg>`;
 }

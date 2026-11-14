@@ -1,4 +1,5 @@
-import { $, esc, show, uid } from './common.js';
+import { $, esc, show, uid, fmt } from './common.js';
+import { accounts } from './supa.js';
 import { getSets, getSet, upsertSet, deleteSet, newSet, parseTable, rowsToItems, cleanItems } from './sets.js';
 import { isOnline } from './net.js';
 
@@ -23,14 +24,18 @@ function renderLib() {
       <h3>${esc(s.title)}</h3>
       <div class="muted">${cleanItems(s.items).length} questions · edited ${new Date(s.updated).toLocaleDateString()}</div>
       <div class="row">
-        <button class="btn primary small" data-play="${s.id}">Boss Raid</button>
+        <button class="btn primary small" data-play="${s.id}" data-game="raid">Boss Raid</button>
+        <button class="btn primary small" data-play="${s.id}" data-game="corners">Four Corners</button>
+        <button class="btn primary small" data-play="${s.id}" data-game="treasure">Treasure Hunt</button>
+      </div>
+      <div class="row">
         <button class="btn small" data-edit="${s.id}">Edit</button>
         <button class="btn small" data-dup="${s.id}">Duplicate</button>
       </div>
     </div>`).join('') : '<p class="muted">No question sets yet. Click “New question set” to make one.</p>';
 }
 
-function play(id) { location.href = 'host.html?set=' + encodeURIComponent(id); }
+function play(id, game = 'raid') { location.href = `host.html?set=${encodeURIComponent(id)}&game=${encodeURIComponent(game)}`; }
 
 function openEditor(set) {
   current = structuredClone(set);
@@ -74,7 +79,7 @@ function saveNow() {
 // ----- Library events -----
 $('#setGrid').addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.play) play(t.dataset.play);
+  if (t.dataset.play) play(t.dataset.play, t.dataset.game);
   if (t.dataset.edit) openEditor(getSet(t.dataset.edit));
   if (t.dataset.dup) {
     const s = structuredClone(getSet(t.dataset.dup));
@@ -112,11 +117,11 @@ $('#importFile').onchange = async e => {
 
 // ----- Editor events -----
 $('#backBtn').onclick = () => { saveNow(); current = null; renderLib(); show('lib'); };
-$('#playFromEdit').onclick = () => {
+document.querySelectorAll('[data-play-edit]').forEach(b => (b.onclick = () => {
   saveNow();
   if (cleanItems(current.items).length < 2) return alert('Add at least 2 questions first.');
-  play(current.id);
-};
+  play(current.id, b.dataset.playEdit);
+}));
 $('#titleInput').oninput = scheduleSave;
 $('#rows').addEventListener('input', e => {
   const inp = e.target; const tr = inp.closest('tr'); if (!tr) return;
@@ -156,5 +161,58 @@ $('#deleteSet').onclick = () => {
 };
 window.addEventListener('beforeunload', () => { if (current) saveNow(); });
 
+// ---------------- Students & coins ----------------
+async function openStudents() {
+  show('students');
+  const box = $('#teacherBox'), list = $('#studentList');
+  list.hidden = true;
+  try {
+    const user = await accounts.user();
+    if (!user) {
+      box.innerHTML = `<p style="margin-top:0">Sign in with your Google account to see students’ coins and to turn on coins in games.</p>
+        <button class="btn primary" id="tSignIn">Sign in with Google</button>`;
+      $('#tSignIn').onclick = () => accounts.signIn().catch(e => alert(e.message));
+      return;
+    }
+    if (!(await accounts.isTeacher())) {
+      box.innerHTML = `<p style="margin-top:0">You’re signed in as <b>${esc(user.email)}</b>, but that email isn’t on the teacher list yet.</p>
+        <p class="muted">Add it in Supabase (see README → “Make yourself the teacher”), then reload.</p><button class="btn small" id="tOut">Sign out</button>`;
+      $('#tOut').onclick = async () => { await accounts.signOut(); openStudents(); };
+      return;
+    }
+    box.innerHTML = `Signed in as <b>${esc(user.email)}</b> (teacher)${accounts.mode === 'demo' ? ' · <span class="muted">Preview mode</span>' : ''}.
+      Coins are on in games you host from this browser. <button class="btn small" id="tOut">Sign out</button>`;
+    $('#tOut').onclick = async () => { await accounts.signOut(); openStudents(); };
+    await renderStudents();
+  } catch (e) { box.textContent = e.message; }
+}
+
+async function renderStudents() {
+  const list = $('#studentList');
+  const rows = await accounts.students();
+  list.hidden = false;
+  if (!rows.length) { list.innerHTML = '<p class="muted">No students have signed in yet. They appear here after they sign in on the join page.</p>'; return; }
+  list.innerHTML = `<p class="muted" style="margin-top:0">Give bonus coins for great work or helping others (or take some away with a minus number).</p>
+    <div class="table-wrap"><table class="editor-table"><thead><tr><th>Name</th><th>Email</th><th>Coins</th><th>Items</th><th>Give coins</th></tr></thead><tbody>
+    ${rows.map(r => `<tr data-id="${esc(r.id)}"><td><b>${esc(r.display_name)}</b></td><td class="muted">${esc(r.email || '')}</td>
+      <td><span class="coin-pill">🪙 ${fmt(r.coins)}</span></td><td>${r.items}</td>
+      <td class="flex"><button class="btn small" data-give="10">+10</button><button class="btn small" data-give="50">+50</button>
+      <input style="width:80px" type="number" placeholder="±" class="giveAmt"><button class="btn small" data-give="custom">Give</button></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+$('#studentList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-give]'); if (!b) return;
+  const tr = b.closest('tr');
+  const amount = b.dataset.give === 'custom' ? parseInt(tr.querySelector('.giveAmt').value, 10) : +b.dataset.give;
+  if (!amount) return;
+  b.disabled = true;
+  try { await accounts.giveCoins(tr.dataset.id, amount, 'From your teacher'); await renderStudents(); }
+  catch (err) { alert(err.message); b.disabled = false; }
+});
+$('#studentsBtn').onclick = openStudents;
+$('#studentsBack').onclick = () => { renderLib(); show('lib'); };
+
 renderBanner();
 renderLib();
+if (location.hash === '#students') openStudents();

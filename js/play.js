@@ -1,7 +1,10 @@
 // Student screen (iPad). Joins a game, shows questions, sends answers.
+// Works for every game type; the projector tells it which game is running.
+// Students can play as a guest, or sign in with Google to use their shop hero and earn coins.
 import { $, esc, show, uid, load, save, fmt, CHOICE_STYLE } from './common.js';
 import { openRoom, isOnline } from './net.js';
-import { avatarSVG, normalizeAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES } from './avatar.js';
+import { accounts } from './supa.js';
+import { avatarSVG, normalizeAvatar, restrictAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES } from './avatar.js';
 
 // One ID per device so a student who reloads keeps their score.
 // In Local Test Mode each tab is its own pretend student.
@@ -17,14 +20,50 @@ function getPid() {
 const pid = getPid();
 const profile = load('cq_profile', null) || { name: '', av: randomAvatar() };
 profile.av = normalizeAvatar(profile.av);
+let account = null; // { user, prof } when signed in
 
 let net = null, netCode = null, code = '';
-let joined = false, joinTries = 0, joinTimer = null;
-let last = null, shownKey = null, myAns = -1;
+let joined = false, joinTries = 0, joinTimer = null, joinedGame = null, coinsOn = false;
+let last = null, shownKey = null, myAns = -1, myPick = -1, myDig = -1;
 let deadline = 0, limit = 1, raf = null;
 
+// ---------------- Account ----------------
+async function loadAccount() {
+  const box = $('#acct');
+  try {
+    const user = await accounts.user();
+    if (!user) {
+      box.hidden = false;
+      box.innerHTML = `<div class="grow"><b>Earn coins & unlock items!</b><br><small>Sign in with your school Google account. (Or just play as a guest below.)</small></div>
+        <button class="btn small primary" id="signInBtn">Sign in</button>`;
+      $('#signInBtn').onclick = () => accounts.signIn().catch(e => alert(e.message));
+      return;
+    }
+    const prof = await accounts.profile();
+    account = { user, prof };
+    profile.name = prof.display_name;
+    profile.av = restrictAvatar(prof.avatar, prof.owned || []);
+    $('#nameIn').value = profile.name;
+    $('#nameIn').readOnly = true;
+    $('#nameNote').hidden = false;
+    $('#toAvatar').textContent = 'Join game!';
+    box.hidden = false;
+    box.innerHTML = `<div class="mini">${avatarSVG(profile.av)}</div>
+      <div class="grow"><b>${esc(prof.display_name)}</b>${accounts.mode === 'demo' ? ' <small>(preview)</small>' : ''}<br><span class="coin-pill">🪙 ${fmt(prof.coins)}</span></div>
+      <a class="btn small primary" href="shop.html">Shop</a>
+      <button class="btn small" id="signOutBtn">Sign out</button>`;
+    $('#signOutBtn').onclick = async () => { await accounts.signOut(); location.reload(); };
+  } catch (e) {
+    console.warn(e);
+    box.hidden = false;
+    box.innerHTML = `<div class="grow"><small>${esc(e.message)}</small></div>`;
+  }
+}
+
 // ---------------- Join ----------------
-const urlCode = new URLSearchParams(location.search).get('code');
+// Game code from the QR link (?join=12345). Older links used ?code=, which Google sign-in also uses, so only accept 5 digits.
+const qs = new URLSearchParams(location.search);
+const urlCode = qs.get('join') || (/^\d{5}$/.test(qs.get('code') || '') ? qs.get('code') : '');
 $('#codeIn').value = (urlCode || '').replace(/\D/g, '').slice(0, 5);
 $('#nameIn').value = profile.name || '';
 
@@ -34,7 +73,9 @@ $('#toAvatar').onclick = () => {
   if (c.length !== 5) return ($('#joinErr').textContent = 'The game code is 5 numbers. Look at the big screen.');
   if (!n) return ($('#joinErr').textContent = 'Please type your name.');
   $('#joinErr').textContent = '';
-  code = c; profile.name = n.slice(0, 16);
+  code = c;
+  if (account) return connect(); // signed-in heroes are designed in the shop
+  profile.name = n.slice(0, 16);
   save('cq_profile', profile);
   renderBuilder();
   show('s-avatar');
@@ -45,7 +86,7 @@ $('#backToJoin').onclick = () => show('s-join');
 $('#joinBtn').onclick = () => { save('cq_profile', profile); connect(); };
 $('#msgBtn').onclick = () => show('s-join');
 
-// ---------------- Avatar builder ----------------
+// ---------------- Guest hero builder (free options only) ----------------
 const GROUPS = [
   { key: 'cls', title: 'Hero class', items: CLASSES.map(c => c.label) },
   { key: 'color', title: 'Outfit color', swatch: COLORS },
@@ -76,12 +117,12 @@ $('#randomize').onclick = () => { profile.av = randomAvatar(); renderBuilder(); 
 const toHost = (m, opts) => {
   try { const r = net && net.toHost(m, opts); if (r && r.catch) r.catch(e => console.warn(e)); } catch (e) { console.warn(e); }
 };
-const sendJoin = (viaRoom = false) => toHost({ t: 'join', id: pid, name: profile.name, av: profile.av }, { viaRoom });
+const sendJoin = (viaRoom = false) => toHost({ t: 'join', id: pid, uid: account ? account.user.id : null, name: profile.name, av: profile.av }, { viaRoom });
 
 // If an update seems to be missing (e.g. the iPad dozed off), politely ask the host to resend.
 let lastSync = 0;
 setInterval(() => {
-  if (!joined || !last || last.phase !== 'question') return;
+  if (!joined || !last || (last.phase !== 'question' && last.phase !== 'dig')) return;
   const now = performance.now();
   if (now > deadline + 4000 && now - lastSync > 5000) { lastSync = now; toHost({ t: 'sync' }); }
 }, 1000);
@@ -123,6 +164,9 @@ function onMsg(m) {
     clearInterval(joinTimer);
     if (m.ok) {
       joined = true;
+      coinsOn = !!m.coinsOn;
+      // Register this account in the game so it can earn coins.
+      if (account && joinedGame !== code) { joinedGame = code; accounts.joinGame(code).catch(e => console.warn(e)); }
       if (m.state) last = m.state;
       render(last || { phase: 'lobby' });
     } else if (m.reason === 'kicked') {
@@ -142,23 +186,42 @@ function onMsg(m) {
 }
 
 // ---------------- Rendering game state ----------------
-function myStats(s) { return (s.stats && s.stats[pid]) || [0, 0, 0]; }
+const myStats = s => (s.stats && s.stats[pid]) || [0, 0, 0, ''];
+const GAME_TEXT = {
+  raid: { intro: 'The boss is here!', right: 'HIT!', wrong: 'Missed!' },
+  corners: { intro: 'Get ready to run!', right: 'SAFE!', wrong: 'LAVA!' },
+  treasure: { intro: 'Treasure Hunt!', right: 'CORRECT!', wrong: 'Not quite!' },
+};
+const text = s => GAME_TEXT[s.mode] || GAME_TEXT.raid;
+
+function startTimer(barSel, screenSel) {
+  cancelAnimationFrame(raf);
+  const loop = () => {
+    const remain = Math.max(0, deadline - performance.now());
+    $(barSel).style.transform = `scaleX(${remain / limit})`;
+    if (remain > 0 && $(screenSel).classList.contains('active')) raf = requestAnimationFrame(loop);
+  };
+  loop();
+}
 
 function render(s) {
   const key = s.phase + ':' + s.qi;
+  document.querySelectorAll('.score-label').forEach(el => (el.textContent = s.scoreName || 'Score'));
   if (s.phase === 'lobby' || s.phase === 'intro') {
-    myAns = -1;
+    myAns = -1; myPick = -1;
     if (shownKey === key) return;
     shownKey = key;
-    $('#waitHero').innerHTML = avatarSVG(profile.av);
-    $('#waitName').textContent = profile.name;
-    if (s.phase === 'intro') { $('#waitTitle').textContent = 'The boss is here!'; $('#waitSub').textContent = 'Get ready to answer…'; }
-    else { $('#waitTitle').textContent = 'You’re in!'; $('#waitSub').textContent = 'Look at the big screen. Your teacher will start soon.'; }
-    show('s-wait');
+    showWait(s.phase === 'intro' ? text(s).intro : 'You’re in!',
+      s.phase === 'intro' ? 'Get ready to answer…' : 'Look at the big screen. Your teacher will start soon.' +
+        (account && !coinsOn ? ' (Coins are off for this game.)' : account ? ' Coins are on!' : ''));
   } else if (s.phase === 'question') {
     const newDeadline = performance.now() + (s.remain || 0);
     if (shownKey !== key || Math.abs(newDeadline - deadline) > 1500) deadline = newDeadline;
     limit = s.limit || 1;
+    if (s.change) { // Four Corners: stay on the choices so the student can switch corners
+      if (shownKey !== key) { shownKey = key; myPick = s.picks && pid in s.picks ? s.picks[pid] : -1; renderQuestion(s); }
+      return;
+    }
     const answered = myAns === s.qi || (s.ans || []).includes(pid);
     if (answered) {
       if (shownKey !== key + ':locked') { shownKey = key + ':locked'; showLocked(); }
@@ -170,38 +233,63 @@ function render(s) {
     if (shownKey === key) return;
     shownKey = key;
     renderResult(s);
-  } else if (s.phase === 'end') {
+  } else if (s.phase === 'dig') {
+    const newDeadline = performance.now() + (s.dig ? s.dig.remain : 0);
+    if (shownKey !== key) { deadline = newDeadline; myDig = -1; }
+    limit = s.dig ? s.dig.limit : 1;
     if (shownKey === key) return;
     shownKey = key;
+    if (s.dig && s.dig.diggers.includes(pid)) renderDig(s);
+    else showWait('Watch the island!', 'Answer the next one right to earn a dig.');
+  } else if (s.phase === 'dug') {
+    if (shownKey === key) return;
+    shownKey = key;
+    const line = s.dres && s.dres[pid];
+    if (line) showResultLine(s, /trap|nothing/i.test(line) ? 'Dig done!' : 'TREASURE!', line, !/trap/i.test(line));
+    else showWait('Digging done!', 'Get ready for the next question.');
+  } else if (s.phase === 'end') {
+    if (shownKey === key + (s.coins ? ':coins' : '')) return;
+    shownKey = key + (s.coins ? ':coins' : '');
     renderEnd(s);
   }
 }
 
-function bossPct(s) { return s.bossMax ? Math.max(0, Math.round((s.bossHp / s.bossMax) * 100)) : 100; }
+function showWait(title, sub) {
+  $('#waitHero').innerHTML = avatarSVG(profile.av);
+  $('#waitName').textContent = profile.name;
+  $('#waitTitle').textContent = title;
+  $('#waitSub').textContent = sub;
+  show('s-wait');
+}
 
 function renderQuestion(s) {
-  const [dmg] = myStats(s);
+  const [score, , , tag] = myStats(s);
   $('#qNum').textContent = `Question ${s.qi + 1} / ${s.total}`;
-  $('#qBoss').textContent = `Boss HP ${bossPct(s)}%`;
-  $('#qDmg').textContent = `DMG ${fmt(dmg)}`;
+  $('#qBoss').textContent = [s.hud, tag].filter(Boolean).join(' · ');
+  $('#qDmg').textContent = `${s.scoreName || 'Score'} ${fmt(score)}`;
   $('#qPrompt').textContent = s.q.prompt;
   $('#pChoices').innerHTML = s.q.choices.map((c, i) =>
-    `<button class="choice ${CHOICE_STYLE[i].cls}" data-c="${i}"><span class="ico">${CHOICE_STYLE[i].icon}</span><span>${esc(c)}</span></button>`).join('');
+    `<button class="choice ${CHOICE_STYLE[i].cls} ${i === myPick ? 'picked' : ''}" data-c="${i}"><span class="ico">${CHOICE_STYLE[i].icon}</span><span>${esc(c)}</span></button>`).join('') +
+    (s.change ? `<div class="pick-note" id="pickNote" style="grid-column:1/-1">${myPick >= 0 ? 'Running there! You can switch until time runs out.' : 'Tap a corner to run there!'}</div>` : '');
   show('s-question');
-  cancelAnimationFrame(raf);
-  const loop = () => {
-    const remain = Math.max(0, deadline - performance.now());
-    $('#tBar').style.transform = `scaleX(${remain / limit})`;
-    if (remain > 0 && $('#s-question').classList.contains('active')) raf = requestAnimationFrame(loop);
-  };
-  loop();
+  startTimer('#tBar', '#s-question');
 }
 
 $('#pChoices').addEventListener('click', e => {
   const b = e.target.closest('.choice');
-  if (!b || !last || last.phase !== 'question' || myAns === last.qi) return;
+  if (!b || !last || last.phase !== 'question') return;
+  const c = +b.dataset.c;
+  if (last.change) {
+    if (c === myPick) return;
+    myPick = c;
+    toHost({ t: 'ans', id: pid, q: last.qi, c });
+    document.querySelectorAll('#pChoices .choice').forEach(el => el.classList.toggle('picked', +el.dataset.c === c));
+    const note = $('#pickNote'); if (note) note.textContent = 'Running there! You can switch until time runs out.';
+    return;
+  }
+  if (myAns === last.qi) return;
   myAns = last.qi;
-  toHost({ t: 'ans', id: pid, q: last.qi, c: +b.dataset.c });
+  toHost({ t: 'ans', id: pid, q: last.qi, c });
   shownKey = last.phase + ':' + last.qi + ':locked';
   showLocked();
 });
@@ -213,37 +301,60 @@ function showLocked() {
 
 function renderResult(s) {
   const res = s.res && s.res[pid];
-  const [dmg, correct, streak] = myStats(s);
   const right = s.q.choices[s.correct];
+  const correct = !!res && res[0] === s.correct;
+  const line = res && res[2] ? esc(res[2]) : '';
+  showResultLine(s, correct ? text(s).right : res ? text(s).wrong : 'Time’s up!',
+    correct ? line : `Correct answer: <b>${esc(right)}</b>` + (line ? `<br>${line}` : ''), correct, true);
+}
+
+function showResultLine(s, title, html, good, isHtml = false) {
+  const [score, correct] = myStats(s);
   const hero = $('#resHero');
   hero.innerHTML = avatarSVG(profile.av);
   hero.className = 'hero-big';
   const t = $('#resTitle');
-  if (res && res[0] === s.correct) {
-    t.textContent = 'HIT!'; t.className = 'result-big good';
-    $('#resSub').innerHTML = `You dealt <b style="color:var(--gold)">${fmt(res[1])}</b> damage!` + (streak >= 3 ? `<br>🔥 ${streak} in a row! Bonus damage!` : '');
-    void hero.offsetWidth; hero.classList.add('hero-attack');
-  } else {
-    t.textContent = res ? 'Missed!' : 'Time’s up!'; t.className = 'result-big bad';
-    $('#resSub').innerHTML = `Correct answer: <b>${esc(right)}</b>`;
-    void hero.offsetWidth; hero.classList.add('hero-sad');
-  }
-  $('#resDmg').textContent = fmt(dmg);
+  t.textContent = title; t.className = 'result-big ' + (good ? 'good' : 'bad');
+  if (isHtml) $('#resSub').innerHTML = html; else $('#resSub').textContent = html;
+  void hero.offsetWidth; hero.classList.add(good ? 'hero-attack' : 'hero-sad');
+  $('#resDmg').textContent = fmt(score);
   $('#resCorrect').textContent = `${correct} / ${s.qi + 1}`;
-  $('#resNote').textContent = s.bossHp <= 0 ? 'The boss is going down!' : s.heal ? 'Too many misses, so the boss healed! Teamwork next time!' : `Boss HP: ${bossPct(s)}%`;
+  $('#resNote').textContent = s.note || s.hud || '';
   show('s-result');
 }
 
+function renderDig(s) {
+  const d = s.dig;
+  $('#digHud').textContent = s.hud || '';
+  const grid = $('#digGrid');
+  grid.style.setProperty('--tw', d.w);
+  grid.innerHTML = [...d.dug].map((c, i) => `<button data-i="${i}" ${c !== '.' ? 'disabled' : ''}>${i + 1}</button>`).join('');
+  show('s-dig');
+  startTimer('#digBar', '#s-dig');
+}
+
+$('#digGrid').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled || !last || last.phase !== 'dig' || myDig >= 0) return;
+  myDig = +b.dataset.i;
+  toHost({ t: 'dig', id: pid, tile: myDig });
+  showWait('Digging…', `You picked spot ${myDig + 1}. Look at the big screen!`);
+});
+
 function renderEnd(s) {
-  const [dmg, correct] = myStats(s);
+  const [score, correct] = myStats(s);
   const rank = (s.ranks || []).indexOf(pid) + 1;
   $('#endHero').innerHTML = avatarSVG(profile.av);
-  $('#endTitle').textContent = s.win ? '🏆 Victory!' : '💨 It escaped!';
-  $('#endTitle').className = 'result-big ' + (s.win ? 'good' : 'bad');
-  $('#endSub').textContent = s.win ? 'Your class defeated the boss!' : 'So close! Ask for a rematch!';
+  $('#endTitle').textContent = s.title || 'Game over!';
+  $('#endTitle').className = 'result-big ' + (s.win === false ? 'bad' : 'good');
+  $('#endSub').textContent = s.sub || '';
   $('#endRank').textContent = rank ? `#${rank} of ${s.ranks.length}` : '-';
-  $('#endDmg').textContent = fmt(dmg);
+  $('#endDmg').textContent = fmt(score);
   $('#endCorrect').textContent = `${correct} / ${s.total}`;
+  const coins = s.coins && s.coins[pid];
+  $('#endCoins').innerHTML = coins
+    ? `<div class="coin-pill" style="font-size:1rem">🪙 +${fmt(coins)} coins!</div><p><a class="btn primary" href="shop.html">Visit the shop</a></p>`
+    : !account ? '<p class="muted">Sign in with Google next time to earn coins for the shop!</p>' : '';
   show('s-end');
 }
 
@@ -255,3 +366,5 @@ async function keepAwake() {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && net && code) { sendJoin(); keepAwake(); }
 });
+
+loadAccount();

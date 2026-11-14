@@ -7,8 +7,9 @@
 //     subscribing to it. If that ever fails, they fall back to the room channel.
 // Local Test Mode: BroadcastChannel (tabs in the same browser only).
 import { CONFIG } from './config.js';
+import { isOnline, getClient } from './supa.js';
 
-export const isOnline = () => !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+export { isOnline };
 
 const roomName = code => 'wr-room-' + code;
 const inboxName = code => 'wr-inbox-' + code;
@@ -41,10 +42,7 @@ async function restBroadcast(topic, payload) {
 // Returns { mode, send(msg) → everyone in room, toHost(msg, {viaRoom}) → host only, close() }
 export async function openRoom(code, onMessage, role = 'player') {
   if (isOnline()) {
-    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm');
-    const client = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-      realtime: { params: { eventsPerSecond: 30 } },
-    });
+    const client = await getClient();
     const room = await subscribe(client, roomName(code), onMessage);
     const channels = [room];
     if (role === 'host') channels.push(await subscribe(client, inboxName(code), onMessage));

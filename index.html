@@ -14,11 +14,13 @@
 
 <section id="s-join" class="screen play active">
   <div class="logo" style="font-size:2.4rem">Wise<span>Realm</span></div>
+  <div class="card acct" id="acct" hidden></div>
   <div class="card box">
     <label class="muted" for="codeIn">Game code</label>
     <input class="input code-input" id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="12345">
     <label class="muted" for="nameIn">Your name</label>
     <input class="input" id="nameIn" maxlength="16" autocomplete="off" autocapitalize="words" placeholder="First name">
+    <div class="muted" id="nameNote" style="font-size:.9rem;margin-top:-6px" hidden>Signed in, so your name and hero come from your account.</div>
     <div id="joinErr" style="color:var(--bad);min-height:1.2em"></div>
     <button class="btn primary big" id="toAvatar">Next ▶</button>
   </div>
@@ -70,7 +72,7 @@
   <p class="result-big" id="resTitle"></p>
   <div id="resSub" style="font-size:1.25rem"></div>
   <div class="stat-row">
-    <div class="card stat">Your damage<b id="resDmg"></b></div>
+    <div class="card stat"><span class="score-label">Score</span><b id="resDmg"></b></div>
     <div class="card stat">Correct<b id="resCorrect"></b></div>
   </div>
   <p class="muted" id="resNote" style="margin:0"></p>
@@ -82,10 +84,18 @@
   <div id="endSub" style="font-size:1.25rem"></div>
   <div class="stat-row">
     <div class="card stat">Your rank<b id="endRank"></b></div>
-    <div class="card stat">Damage<b id="endDmg"></b></div>
+    <div class="card stat"><span class="score-label">Score</span><b id="endDmg"></b></div>
     <div class="card stat">Correct<b id="endCorrect"></b></div>
   </div>
+  <div id="endCoins"></div>
   <p class="muted">Great job, hero! Stay here, your teacher might start another round.</p>
+</section>
+
+<section id="s-dig" class="screen play q-screen">
+  <div class="q-top"><span>⛏ Dig time!</span><span id="digHud"></span></div>
+  <div class="timer-bar"><div id="digBar"></div></div>
+  <h2 style="margin:6px 0 0">Tap a spot on the island to dig!</h2>
+  <div class="dig-grid" id="digGrid"></div>
 </section>
 
 <section id="s-msg" class="screen play">

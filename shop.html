@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1446">
+<title>WiseRealm · Shop</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .shop { flex-direction: column; max-width: 1150px; margin: 0 auto; padding: 18px 16px 60px; gap: 18px; }
+  .shop-main { display: grid; grid-template-columns: 300px 1fr; gap: 26px; align-items: start; }
+  .mirror { padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 12px; position: sticky; top: 12px; }
+  .mirror .hero-big { width: 260px; height: 240px; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tabs .btn.sel { background: var(--gold); color: #2b1a00; }
+  .panel { padding: 18px; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+  .item { background: #15122c; border: 3px solid var(--ink); box-shadow: 0 0 0 2px var(--line); padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: center; text-align: center; cursor: pointer; }
+  .item.trying { box-shadow: 0 0 0 3px var(--gold); }
+  .item .pic { width: 120px; height: 110px; }
+  .item .nm { font-weight: 700; }
+  .item .price { font-family: var(--pixel); font-size: .7rem; color: var(--gold); }
+  .item .owned { font-family: var(--pixel); font-size: .65rem; color: var(--good); }
+  .item .btn { width: 100%; }
+  .slot-title { margin: 18px 0 10px; }
+  .slot-title:first-child { margin-top: 0; }
+  .save-note { min-height: 1.4em; font-weight: 600; }
+  @media (max-width: 760px) { .shop-main { grid-template-columns: 1fr; } .mirror { position: static; } }
+</style>
+</head>
+<body>
+<section class="screen shop active">
+  <div class="topbar">
+    <div class="logo">Wise<span>Realm</span> <span class="muted" style="font-size:.8rem">Shop</span></div>
+    <div class="flex">
+      <span class="coin-pill" id="coins" hidden></span>
+      <a class="btn" href="index.html">Play ▶</a>
+      <button class="btn small" id="signOut" hidden>Sign out</button>
+    </div>
+  </div>
+  <div id="previewBanner" class="banner" hidden>🧪 Preview mode: Google sign-in isn’t set up yet, so these coins are pretend and only saved on this device.</div>
+  <div id="gate" class="card panel" hidden>
+    <h2 style="margin-top:0">Sign in to open the shop</h2>
+    <p class="muted">Use your school Google account. Your hero, coins and items are saved to your account.</p>
+    <button class="btn primary big" id="signIn">Sign in with Google</button>
+    <p id="gateErr" style="color:var(--bad)"></p>
+  </div>
+  <div class="shop-main" id="main" hidden>
+    <div class="card mirror">
+      <h3 style="margin:0" id="who"></h3>
+      <div class="hero-big" id="mirror"></div>
+      <div class="save-note" id="saveNote"></div>
+      <button class="btn primary big" id="save">Save my hero</button>
+      <button class="btn small" id="undo">Undo changes</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="tabs" id="tabs">
+        <button class="btn sel" data-tab="look">Customize</button>
+        <button class="btn" data-tab="shop">Shop</button>
+        <button class="btn" data-tab="mine">My items</button>
+      </div>
+      <div class="card panel" id="panel"></div>
+    </div>
+  </div>
+</section>
+<script type="module" src="js/shop.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WiseRealm · Boss Raid</title>
+<title>WiseRealm</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
 <section id="lobbyScreen" class="screen host">
   <div class="host-bar">
     <div class="logo">Wise<span>Realm</span></div>
-    <div class="muted">Boss Raid · <span class="set-title"></span></div>
+    <div class="muted"><span class="mode-name"></span> · <span class="set-title"></span></div>
     <span class="spacer"></span>
     <button class="btn small mute-btn"></button>
     <button class="btn small fs-btn">⛶ Full screen</button>
@@ -41,7 +41,8 @@
       <div class="roster" id="roster"></div>
     </div>
     <div class="card side">
-      <h3 style="margin:0">Game settings</h3>
+      <h3 style="margin:0" class="mode-name"></h3>
+      <p class="muted" id="modeBlurb" style="margin:-4px 0 0;font-size:.9rem"></p>
       <label>Time per question <select id="setTime">
         <option value="10">10 sec</option><option value="15">15 sec</option><option value="20">20 sec</option>
         <option value="30">30 sec</option><option value="45">45 sec</option><option value="60">60 sec</option><option value="90">90 sec</option>
@@ -50,11 +51,9 @@
       <label title="For word / definition sets">Flip vocab cards <input type="checkbox" id="setFlip"></label>
       <p class="muted" style="margin:-6px 0 0;font-size:.82rem">Flipped: show the definition, pick the word.</p>
       <label>Auto-advance <input type="checkbox" id="setAuto"></label>
-      <div>
-        <div style="margin-bottom:6px">Boss</div>
-        <div class="boss-pick" id="bossPick"></div>
-        <div class="muted" id="bossName" style="font-size:.85rem;margin-top:4px"></div>
-      </div>
+      <div id="modeSettings"></div>
+      <hr>
+      <div id="coinBox" class="coin-box muted">Checking coins…</div>
       <hr>
       <div class="muted" style="font-size:.85rem">Testing tools</div>
       <div class="flex">
@@ -62,12 +61,12 @@
         <button class="btn small" id="openStudent">Open a test student</button>
       </div>
       <span class="spacer"></span>
-      <button class="btn primary big" id="startBtn">Start battle!</button>
+      <button class="btn primary big" id="startBtn">Start game!</button>
     </div>
   </div>
 </section>
 
-<section id="battleScreen" class="screen host">
+<section id="gameScreen" class="screen host">
   <div class="host-bar">
     <div class="logo">Wise<span>Realm</span></div>
     <div class="title" id="qCounter"></div>
@@ -78,32 +77,25 @@
     <button class="btn small danger" id="endEarly">End game</button>
   </div>
   <div class="arena">
-    <div class="hp-wrap">
-      <div class="hp-name" id="bossTitle"></div>
-      <div class="hp-bar"><div class="hp-ghost" id="hpGhost"></div><div class="hp-fill" id="hpFill"></div><div class="hp-text" id="hpText"></div></div>
-    </div>
-    <div class="battle">
-      <div class="boss-area" id="bossArea"><div class="boss" id="boss"></div></div>
-      <div class="qpanel" id="qpanel">
-        <div class="card qcard">
-          <div class="ring" id="ring">
-            <svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" stroke="rgba(255,255,255,.15)" stroke-width="8" fill="none"/>
-            <circle id="ringFg" cx="42" cy="42" r="36" stroke="#ffd166" stroke-width="8" fill="none" stroke-linecap="butt" stroke-dasharray="226.2" stroke-dashoffset="0"/></svg>
-            <span id="ringNum"></span>
-          </div>
-          <div class="qtext" id="qText"></div>
+    <div class="qpanel" id="qpanel">
+      <div class="card qcard">
+        <div class="ring" id="ring">
+          <svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" stroke="rgba(255,255,255,.15)" stroke-width="8" fill="none"/>
+          <circle id="ringFg" cx="42" cy="42" r="36" stroke="#ffd166" stroke-width="8" fill="none" stroke-linecap="butt" stroke-dasharray="226.2" stroke-dashoffset="0"/></svg>
+          <span id="ringNum"></span>
         </div>
-        <div class="h-choices" id="hChoices"></div>
-        <div class="flex">
-          <div class="status-line" id="statusLine"></div>
-          <div class="round-msg" id="roundMsg"></div>
-          <span class="spacer"></span>
-          <button class="btn" id="skipBtn">Stop timer</button>
-          <button class="btn primary big" id="nextBtn" hidden>Next ▶</button>
-        </div>
+        <div class="qtext" id="qText"></div>
       </div>
+      <div class="h-choices" id="hChoices"></div>
     </div>
-    <div class="party" id="party"></div>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <div class="status-line" id="statusLine"></div>
+      <div class="round-msg" id="roundMsg"></div>
+      <span class="spacer"></span>
+      <button class="btn" id="skipBtn">Stop timer</button>
+      <button class="btn primary big" id="nextBtn" hidden>Next ▶</button>
+    </div>
   </div>
 </section>
 
@@ -118,6 +110,7 @@
     <div class="muted" id="endSub" style="font-size:1.3rem"></div>
     <div class="podium" id="podium"></div>
     <div class="stat-row" id="endList"></div>
+    <div id="coinStatus" class="muted" style="font-size:1.1rem"></div>
     <div class="flex" style="justify-content:center">
       <button class="btn primary big" id="againBtn">Play again</button>
       <a class="btn big" href="teacher.html">Done</a>

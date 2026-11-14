@@ -1,28 +1,47 @@
-# WiseRealm: Boss Raid (Step 1)
+# WiseRealm
 
-Turn your question sets and vocabulary lists into a live class game. Students make a hero on
-their iPad, join with a code, and the whole class fights a boss on the projector by answering
-questions correctly.
+Turn your question sets and vocabulary lists into live class games. Students sign in with their
+school Google account (or play as a guest), design a pixel hero, join with a code, and play on
+their iPads while the game runs on the projector. Playing earns coins to spend in the shop.
 
-**Cost: $0.** It's plain web files with no build step. It runs on free GitHub Pages hosting
-and Supabase's free tier.
+**Cost: $0.** Plain web files with no build step, hosted free on GitHub Pages, using Supabase's free tier.
+
+## The games
+
+| Game | How it works |
+|---|---|
+| **Boss Raid** | The class teams up. Correct answers attack the boss; fast answers hit harder. Beat the boss before the questions run out. |
+| **Four Corners Dash** | Each answer is a corner of the map. Students tap a corner and their hero runs there (they can switch until time's up). Wrong corners turn to lava. 3 hearts each; knocked-out heroes become ghosts who revive after 2 correct answers in a row. |
+| **Treasure Hunt** | A correct answer earns a dig. Diggers pick a spot on the island from their iPads to find gold, gems, chests… or a trap. Luck keeps it close. |
 
 ## The pages
 
 | Page | Who uses it |
 |---|---|
-| `teacher.html` | You. Make and edit question sets, paste from Google Sheets or Flippity, and start a game. |
-| `host.html` | Opened automatically when you click **Boss Raid**. Put it on the projector. |
-| `index.html` | Students. They go to the site's main address on their iPads. |
+| `teacher.html` | You. Make question sets, start any of the three games, and see students' coins (**Students & coins**). |
+| `host.html` | Opens when you start a game. Put it on the projector. |
+| `index.html` | Students join games here (wiserealm.org). |
+| `shop.html` | Students design their hero and buy items with coins. |
 
-## Try it right now (Local Test Mode)
+## Coins and the shop
 
-With no Supabase connection, the game runs in **Local Test Mode**. Everything works, but only
-between tabs in the same browser on one computer:
+- Signed-in students earn coins at the end of each game: **20 for playing, 10 per correct answer,
+  +30/20/10 for the top 3, +25 if the class beats the boss** (max 300 per game).
+- Coins are only awarded when **you are signed in on the projector** as a teacher. The lobby shows
+  "Coins: on" or "Coins: off".
+- The shop has hats, outfits, capes, face items and pets (30 items, 50–400 coins). Students can try
+  anything on before buying. Prices live in the database, so they can't be changed from a browser.
+- On **Students & coins** you can give bonus coins (or take some away with a minus number).
+- Guests can still play every game; they just don't earn coins.
 
-1. Open `teacher.html` and click **⚔ Boss Raid** on a sample set.
-2. Click **+ Add 5 test bots** and/or **Open a test student** (opens a student tab).
-3. Click **Start battle**.
+## Try it right now (Local Test Mode / Preview)
+
+Without Supabase settings, games only connect tabs in the same browser, and accounts run in
+**Preview mode** (a pretend account with 500 coins, saved on that device):
+
+1. Open `teacher.html` and click a game on a sample set.
+2. Click **+ Add 5 test bots** and/or **Open a test student**.
+3. Click **Start game!**
 
 ## Going live with student iPads (one-time setup, about 15 minutes)
 
@@ -99,7 +118,41 @@ Any change pushed to the `main` branch updates the live site automatically.
 
 **Tip for iPads:** In Safari, tap Share → **Add to Home Screen** so WiseRealm opens like an app.
 
-## How Boss Raid works
+### 3. Student accounts with Google sign-in (one-time, about 20 minutes)
+
+**a. Create the database tables.** In Supabase open **SQL Editor → New query**, paste the whole
+file `supabase/schema.sql`, and click **Run**. (Safe to run again after updates.)
+
+**b. Make yourself the teacher.** In the SQL Editor run (with your own email):
+
+```sql
+insert into public.teachers (email) values ('you@yourschool.org');
+```
+
+**c. Create a Google sign-in key** at **console.cloud.google.com** (any Google account works):
+1. Create a project called `WiseRealm`.
+2. **APIs & Services → OAuth consent screen**: choose **External**, app name `WiseRealm`, your email
+   as support/contact email. Add the scopes `email`, `profile`, `openid` only. Then **Publish app**.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**, type **Web application**.
+   - Authorized JavaScript origins: `https://wiserealm.org`
+   - Authorized redirect URIs: `https://jcmaiiubsvtrfbamaaqh.supabase.co/auth/v1/callback`
+4. Copy the **Client ID** and **Client secret**.
+
+**d. Turn on Google in Supabase.** **Authentication → Sign In / Providers → Google**: switch it on,
+paste the Client ID and Client secret, and save. Then **Authentication → URL Configuration**:
+- Site URL: `https://wiserealm.org`
+- Redirect URLs: add `https://wiserealm.org/**`
+
+**e. Ask your school's IT admin to allow WiseRealm.** Google Workspace for Education blocks
+students under 18 from signing in to outside apps unless an admin allows them. Give IT the
+**Client ID** from step c and ask them to mark it as **Trusted** in the Admin console
+(**Security → Access and data control → API controls → Manage third-party app access**).
+Until then, students can still play as guests.
+
+**What's stored about students:** their Google email, first name and last initial, their hero,
+coins and items. Nothing else. No passwords are ever seen by WiseRealm.
+
+## Boss Raid details
 
 - **Boss health** scales with the number of players and questions, so the class needs roughly
   65–70% correct to win.
@@ -125,21 +178,30 @@ Any change pushed to the `main` branch updates the live site automatically.
 ## Files
 
 ```
-index.html  teacher.html  host.html
-css/style.css
-js/config.js   ← your Supabase settings
-js/net.js      messaging (Supabase or local test mode)
-js/sets.js     question sets, spreadsheet paste, question building
-js/avatar.js   hero character art (layers, ready for shop items later)
-js/boss.js     boss art
-js/host.js     projector game logic
-js/play.js     student iPad screens
-js/teacher.js  teacher page
-js/sound.js    sound effects
+index.html  teacher.html  host.html  shop.html
+css/style.css          fonts/ (pixel fonts, open license)
+js/config.js           ← your Supabase settings
+js/supa.js             accounts, coins, shop (Supabase or Preview mode)
+js/net.js              live game messaging
+js/host.js             projector game engine (lobby, questions, scoring, coins)
+js/modes/raid.js       Boss Raid
+js/modes/corners.js    Four Corners Dash
+js/modes/treasure.js   Treasure Hunt
+js/play.js             student iPad screens
+js/shop.js             the shop
+js/items.js            shop items (pixel art + prices)
+js/avatar.js           hero art     js/boss.js  boss art     js/sound.js  chiptune sounds
+js/sets.js             question sets     js/teacher.js  teacher page
+supabase/schema.sql    database tables and rules
+tools/gen-shop-sql.mjs copies item prices from js/items.js into schema.sql
 ```
+
+**Changing a price or adding an item:** edit `js/items.js`, run `node tools/gen-shop-sql.mjs`,
+then run `supabase/schema.sql` again in the Supabase SQL Editor.
 
 ## Roadmap
 1. ✅ Question editor + Boss Raid
-2. Four Corners Dash (tap-to-move)
-3. Treasure Island
-4. Student accounts, coins, and the item shop
+2. ✅ Four Corners Dash
+3. ✅ Treasure Hunt
+4. ✅ Google sign-in, coins and the item shop
+5. Next ideas: question sets saved to your account, class rosters, more games and items
