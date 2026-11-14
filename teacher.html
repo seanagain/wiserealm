@@ -12,7 +12,7 @@
   <div class="topbar">
     <div class="logo">Wise<span>Realm</span> <span class="muted" style="font-size:1rem;font-weight:500">Teacher</span></div>
     <div class="flex">
-      <button class="btn" id="studentsBtn">🪙 Students &amp; coins</button>
+      <button class="btn primary" id="studentsBtn">📊 Classes &amp; progress</button>
       <button class="btn" id="importBtn">Restore backup</button>
       <button class="btn" id="exportBtn">Download backup</button>
       <button class="btn primary" id="newBtn">+ New question set</button>
@@ -69,10 +69,28 @@
     <button class="btn" id="studentsBack">← All sets</button>
     <div class="flex"><a class="btn" href="shop.html">Open the shop</a></div>
   </div>
-  <h2 style="margin:0">Students &amp; coins</h2>
+  <h2 style="margin:0">Classes &amp; progress</h2>
   <div class="card" style="padding:18px" id="teacherBox">Checking your account…</div>
-  <div class="card" style="padding:18px" id="studentList" hidden></div>
+  <div id="classesArea" hidden style="display:flex;flex-direction:column;gap:20px">
+    <div class="card" style="padding:18px">
+      <div class="flex">
+        <input class="input" id="newClassName" maxlength="60" placeholder="New class name, e.g. Grade 8 · Period 2" style="max-width:420px">
+        <button class="btn primary" id="createClass">+ Create class</button>
+        <label class="flex muted"><input type="checkbox" id="showArchived"> Show archived</label>
+      </div>
+      <p class="muted" style="margin:10px 0 0;font-size:.9rem">Students join with the class code on their profile page, or automatically when you pick the class in a game lobby.</p>
+    </div>
+    <div class="class-grid" id="classGrid"></div>
+    <details class="card" style="padding:18px" id="allAccounts">
+      <summary style="cursor:pointer;font-weight:700">All signed-in students &amp; coins</summary>
+      <div id="studentList" style="margin-top:12px"></div>
+    </details>
+  </div>
+  <div id="classView" hidden style="display:flex;flex-direction:column;gap:18px"></div>
 </section>
+
+<dialog id="detail" class="wide"><div id="detailBody"></div><div class="flex" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="detailClose">Close</button></div></dialog>
+<dialog id="codeDialog" class="wide" style="text-align:center"><div id="codeBody"></div><button class="btn" id="codeClose" style="margin-top:16px">Close</button></dialog>
 
 <script type="module" src="js/teacher.js"></script>
 </body>

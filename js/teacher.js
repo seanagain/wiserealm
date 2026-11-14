@@ -1,5 +1,6 @@
 import { $, esc, show, uid, fmt } from './common.js';
 import { accounts } from './supa.js';
+import { showClasses } from './classes.js';
 import { getSets, getSet, upsertSet, deleteSet, newSet, parseTable, rowsToItems, cleanItems } from './sets.js';
 import { isOnline } from './net.js';
 
@@ -164,8 +165,8 @@ window.addEventListener('beforeunload', () => { if (current) saveNow(); });
 // ---------------- Students & coins ----------------
 async function openStudents() {
   show('students');
-  const box = $('#teacherBox'), list = $('#studentList');
-  list.hidden = true;
+  const box = $('#teacherBox');
+  $('#classesArea').hidden = true; $('#classView').hidden = true;
   try {
     const user = await accounts.user();
     if (!user) {
@@ -181,8 +182,9 @@ async function openStudents() {
       return;
     }
     box.innerHTML = `Signed in as <b>${esc(user.email)}</b> (teacher)${accounts.mode === 'demo' ? ' · <span class="muted">Preview mode</span>' : ''}.
-      Coins are on in games you host from this browser. <button class="btn small" id="tOut">Sign out</button>`;
+      Coins and progress tracking are on in games you host from this browser. <button class="btn small" id="tOut">Sign out</button>`;
     $('#tOut').onclick = async () => { await accounts.signOut(); openStudents(); };
+    await showClasses();
     await renderStudents();
   } catch (e) { box.textContent = e.message; }
 }
@@ -215,4 +217,4 @@ $('#studentsBack').onclick = () => { renderLib(); show('lib'); };
 
 renderBanner();
 renderLib();
-if (location.hash === '#students') openStudents();
+if (location.hash === '#students' || location.hash === '#classes') openStudents();

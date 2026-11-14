@@ -246,7 +246,19 @@ async function setupTeacher() {
     }
     await accounts.createGame(code, mode.id);
     G.teacher = true;
-    box.innerHTML = `<b style="color:var(--good)">Coins: on</b><br><span class="muted">Signed-in students earn coins.${accounts.mode === 'demo' ? ' (Preview mode)' : ''}</span>`;
+    const classes = (await accounts.teacherClasses().catch(() => [])).filter(c => !c.archived);
+    if (!classes.some(c => c.id === S.classId)) S.classId = '';
+    box.innerHTML = `<b style="color:var(--good)">Coins &amp; progress: on</b><br><span class="muted">Signed-in students earn coins and their results are saved.${accounts.mode === 'demo' ? ' (Preview mode)' : ''}</span>
+      <label style="margin-top:8px">Class <select id="classPick"><option value="">No class</option>${classes.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+      <div class="muted" id="classHint" style="font-size:.82rem"></div>`;
+    const pick = $('#classPick');
+    const hint = () => {
+      const c = classes.find(x => x.id === S.classId);
+      $('#classHint').textContent = c ? `Results go to ${c.name}. Players are added to the class automatically.` : classes.length ? 'Pick a class to track progress.' : 'Create classes on the teacher page (Classes & progress).';
+    };
+    pick.value = S.classId || '';
+    pick.onchange = () => { S.classId = pick.value; save('cq_host_settings', S); hint(); };
+    hint();
   } catch (e) {
     console.warn(e);
     box.innerHTML = `<b>Coins: off</b><br><span class="muted">${esc(e.message)}</span>`;
@@ -276,7 +288,8 @@ async function startGame() {
   const flow = ++G.flow;
   G.round++;
   G.qs = qs; G.qi = -1; G.end = null; G.coins = null; G.reveal = null;
-  for (const p of G.players.values()) { p.score = 0; p.correct = 0; p.streak = 0; p.m = {}; }
+  for (const p of G.players.values()) { p.score = 0; p.correct = 0; p.streak = 0; p.m = {}; p.answered = 0; p.missed = []; }
+  G.qstats = [];
   ctx.stage = $('#stage');
   ctx.stage.innerHTML = '';
   ctx.stage.className = 'stage stage-' + mode.id;
@@ -358,6 +371,13 @@ async function endQuestion() {
     if (correct) { p.correct++; p.streak++; } else p.streak = 0;
     return { p, a, correct, frac: a ? Math.min(1, a.el / G.limit) : 1 };
   });
+  // Progress tracking (real players only, not test bots)
+  const real = results.filter(r => !r.p.bot);
+  G.qstats[G.qi] = { p: q.prompt, a: q.choices[q.correct], n: real.filter(r => r.a).length, r: real.filter(r => r.correct).length };
+  for (const r of real) {
+    r.p.answered = (r.p.answered || 0) + (r.a ? 1 : 0);
+    if (!r.correct) (r.p.missed = r.p.missed || []).push(G.qi);
+  }
   const out = mode.reveal(ctx, q, results);
   G.reveal = out;
   broadcast();
@@ -427,7 +447,8 @@ async function endGame() {
   // Award coins to signed-in students (the database double-checks everything).
   const status = $('#coinStatus');
   const n = Object.keys(byPlayer).length;
-  if (!G.teacher) { status.textContent = 'Coins are off for this game (teacher not signed in).'; return; }
+  if (!G.teacher) { status.textContent = 'Coins and progress are off for this game (teacher not signed in).'; return; }
+  saveResults(list, byPlayer);
   if (!n) { status.textContent = 'No signed-in students this round, so no coins were awarded.'; return; }
   status.textContent = 'Awarding coins…';
   try {
@@ -441,6 +462,21 @@ async function endGame() {
     console.warn(e);
     status.textContent = 'Could not award coins: ' + e.message;
   }
+}
+
+// Save this game's results so the teacher can see progress (Classes & progress on the teacher page).
+async function saveResults(list, coins) {
+  const asked = G.qstats.filter(Boolean).length;
+  if (!asked) return;
+  // Places are counted among real players (test bots don't count).
+  const humans = list.filter(p => !p.bot);
+  const results = humans.map((p, i) => ({ p, rank: i + 1 })).filter(x => x.p.uid).map(({ p, rank }) => ({
+    uid: p.uid, score: p.score, correct: p.correct, answered: p.answered || 0, total: asked, rank, players: humans.length,
+    coins: coins[p.id] || 0, missed: p.missed || [],
+  }));
+  try {
+    await accounts.recordGame(code, G.round, S.classId || null, mode.id, set.title, G.qstats.filter(Boolean), results);
+  } catch (e) { console.warn('Could not save results', e); }
 }
 
 // ---------------- Controls ----------------

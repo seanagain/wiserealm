@@ -22,6 +22,7 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 | `host.html` | Opens when you start a game. Put it on the projector. |
 | `index.html` | Students join games here (wiserealm.org). |
 | `shop.html` | Students design their hero and buy items with coins. |
+| `me.html` | Students' profile: join a class, see their stats, progress chart and badges. |
 
 ## Coins and the shop
 
@@ -33,6 +34,21 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
   anything on before buying. Prices live in the database, so they can't be changed from a browser.
 - On **Students & coins** you can give bonus coins (or take some away with a minus number).
 - Guests can still play every game; they just don't earn coins.
+
+## Classes and progress
+
+- On the teacher page, **📊 Classes & progress → Create class** (e.g. "Grade 8 · Period 2"). Each class
+  gets a 6-letter code. Click **Show join code** to put it on the projector.
+- Students join from **wiserealm.org/me.html** (their profile page) by typing the code, or automatically:
+  pick the class in the game lobby's **Class** menu and everyone who plays signed in is added.
+- After every game (when you're signed in), each signed-in student's score, accuracy and missed
+  questions are saved to the class.
+- Open a class to see: every student's accuracy, a trend chart of their last 10 games, coins,
+  game history with per-question results, and **What to reteach** (the questions the class gets
+  wrong most). Tick questions there and click **Make a review set** to replay just those.
+- **Export CSV** downloads the class summary for your gradebook.
+- Students see their own stats, accuracy chart, recent games and achievement badges on **My profile**.
+- Only signed-in students are tracked; guests can play but nothing is saved for them.
 
 ## Try it right now (Local Test Mode / Preview)
 
@@ -189,6 +205,9 @@ js/modes/corners.js    Four Corners Dash
 js/modes/treasure.js   Treasure Hunt
 js/play.js             student iPad screens
 js/shop.js             the shop
+js/me.js               student profile page
+js/classes.js          teacher classes & progress dashboard
+js/charts.js           small progress charts
 js/items.js            shop items (pixel art + prices)
 js/avatar.js           hero art     js/boss.js  boss art     js/sound.js  chiptune sounds
 js/sets.js             question sets     js/teacher.js  teacher page

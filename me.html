@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1446">
+<title>WiseRealm · My Profile</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .me { flex-direction: column; max-width: 1100px; margin: 0 auto; padding: 18px 16px 60px; gap: 22px; }
+  .me-top { display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: start; }
+  .hero-card { padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .hero-card .hero-big { width: 240px; height: 222px; }
+  .panel { padding: 18px; }
+  .panel h3 { margin: 0 0 12px; }
+  .class-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .class-row .grow { flex: 1; }
+  @media (max-width: 760px) { .me-top { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<section class="screen me active">
+  <div class="topbar">
+    <div class="logo">Wise<span>Realm</span> <span class="muted" style="font-size:.8rem">My profile</span></div>
+    <div class="flex">
+      <a class="btn" href="index.html">Play ▶</a>
+      <a class="btn" href="shop.html">Shop</a>
+      <button class="btn small" id="signOut" hidden>Sign out</button>
+    </div>
+  </div>
+  <div id="previewBanner" class="banner" hidden>🧪 Preview mode: Google sign-in isn’t set up on this device, so this is a pretend account.</div>
+  <div id="gate" class="card panel" hidden>
+    <h2 style="margin-top:0">Sign in to see your profile</h2>
+    <p class="muted">Use your school Google account to save your hero, coins and progress.</p>
+    <button class="btn primary big" id="signIn">Sign in with Google</button>
+    <p id="gateErr" style="color:var(--bad)"></p>
+  </div>
+  <div id="main" hidden style="display:flex;flex-direction:column;gap:22px">
+    <div class="me-top">
+      <div class="card hero-card">
+        <h3 style="margin:0" id="name"></h3>
+        <div class="hero-big" id="hero"></div>
+        <span class="coin-pill" id="coins"></span>
+        <a class="btn small" href="shop.html">Change my hero</a>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="card panel">
+          <h3>My classes</h3>
+          <div id="classes"></div>
+          <div class="flex" style="margin-top:12px">
+            <input class="input" id="classCode" maxlength="8" placeholder="Class code" style="max-width:200px;text-transform:uppercase;font-family:var(--pixel);font-size:1rem;letter-spacing:.15em">
+            <button class="btn primary" id="joinClass">Join class</button>
+          </div>
+          <div id="classMsg" style="min-height:1.3em;margin-top:6px;font-weight:600"></div>
+        </div>
+        <div class="tiles" id="tiles"></div>
+      </div>
+    </div>
+    <div class="card panel">
+      <h3>My accuracy, last 15 games</h3>
+      <div id="chart"></div>
+    </div>
+    <div class="card panel">
+      <h3>Achievements</h3>
+      <div class="badges" id="badges"></div>
+    </div>
+    <div class="card panel">
+      <h3>Recent games</h3>
+      <div class="table-wrap" id="games"></div>
+    </div>
+  </div>
+</section>
+<script type="module" src="js/me.js"></script>
+</body>
+</html>
