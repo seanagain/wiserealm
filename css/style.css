@@ -446,3 +446,50 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 .sync-pill.saving { border-color: var(--gold); color: var(--gold); }
 .sync-pill.offline, .sync-pill.local { border-color: var(--bad); color: #ffb3bf; }
 .roster { padding-top: 48px; }
+
+/* ===================== Mr. C's Maze ===================== */
+.mz-wrap { display: grid; grid-template-columns: 1fr 240px; gap: 18px; height: 100%; min-height: 0; }
+.mz-board-wrap { min-height: 0; display: grid; place-items: center; }
+.mz-board { position: relative; border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); background: #1c1829; overflow: hidden; }
+.mz-walls { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mz-board > div:not(.dmg) { position: absolute; transform: translate(-50%, -50%); }
+.mz-start, .mz-exit { font-family: var(--pixel); font-size: 9px; color: var(--muted); }
+.mz-exit { font-size: clamp(14px, 2vw, 28px); animation: bob 1s steps(2) infinite; }
+.mz-gate { width: var(--tile); height: auto; aspect-ratio: 1; display: grid; place-items: center; background: #8b5a2b; border: 3px solid #5c3a1a; box-shadow: inset 0 0 0 2px #c08a4a;
+  font-size: clamp(10px, 1.3vw, 20px); z-index: 2; }
+.mz-gate span { position: absolute; right: -6px; bottom: -6px; font-family: var(--pixel); font-size: 8px; background: var(--good); color: var(--ink); padding: 1px 3px; border: 2px solid var(--ink); }
+.mz-gate.flash { animation: gateFlash .6s steps(3); }
+@keyframes gateFlash { 50% { background: var(--good); } }
+.mz-gem { color: #4cc9f0; font-size: clamp(9px, 1.1vw, 16px); text-shadow: 0 0 6px #4cc9f0; animation: bob 1.2s steps(2) infinite; z-index: 1; }
+.mz-hero { width: calc(var(--tile) * 1.7); z-index: 4; transition: left .19s steps(2), top .19s steps(2); text-align: center; transform: translate(-50%, -72%) !important; }
+.mz-hero .av-wrap { width: 100%; aspect-ratio: 26 / 24; }
+.mz-hero .nm { font-size: 9px; background: var(--ink); padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160%; margin-left: -30%; }
+.mz-hero.busy::before { content: '?'; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-family: var(--pixel); font-size: 10px; background: var(--gold); color: var(--ink); padding: 2px 4px; border: 2px solid var(--ink); }
+.mz-hero.fight::before { content: '⚔'; background: var(--bad); color: #fff; }
+.mz-hero.inv .av-wrap { animation: blinkInv .3s steps(2) infinite; }
+@keyframes blinkInv { 50% { opacity: .3; } }
+.mz-hero.done { opacity: .5; }
+.mz-mrc { width: calc(var(--tile) * 2.2); z-index: 5; transition: left .4s steps(2), top .4s steps(2); filter: drop-shadow(0 0 6px rgba(255, 60, 60, .7)); }
+.mz-mrc svg { width: 100%; height: auto; display: block; }
+.mz-mrc.stunned { filter: grayscale(.7) brightness(.8); animation: sad .8s steps(4) infinite; }
+
+/* Student arrow pad */
+.maze-screen { justify-content: flex-start; padding-top: 16px; }
+.mz-hud { width: 100%; max-width: 700px; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 1.2rem; }
+.mz-hud .hearts { color: #ff5d73; font-size: 1.6rem; letter-spacing: 2px; }
+.mz-msg { width: 100%; max-width: 700px; padding: 14px; font-size: 1.15rem; min-height: 64px; }
+.mz-msg.good { box-shadow: 0 0 0 4px var(--good), 0 0 0 4px var(--ink); }
+.mz-msg.bad { box-shadow: 0 0 0 4px var(--bad), 0 0 0 4px var(--ink); }
+.dpad { display: grid; grid-template-columns: repeat(3, min(26vw, 140px)); grid-template-rows: repeat(3, min(26vw, 140px)); gap: 10px; margin-top: 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.dpad button { font-size: 2.6rem; background: #3b3575; color: var(--text); border: 4px solid var(--ink); border-radius: 0; box-shadow: var(--bevel), 0 5px 0 var(--ink); touch-action: none; -webkit-touch-callout: none; }
+.dpad button.held { background: var(--gold); color: var(--ink); transform: translateY(3px); box-shadow: var(--bevel), 0 2px 0 var(--ink); }
+.dpad [data-d="u"] { grid-column: 2; grid-row: 1; } .dpad [data-d="l"] { grid-column: 1; grid-row: 2; }
+.dpad [data-d="r"] { grid-column: 3; grid-row: 2; } .dpad [data-d="d"] { grid-column: 2; grid-row: 3; }
+.dpad .mid { grid-column: 2; grid-row: 2; display: grid; place-items: center; }
+.mz-q { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 14px; }
+.mz-q .kind { font-family: var(--pixel); font-size: .9rem; color: var(--gold); }
+.mz-q .kind.fight { color: var(--bad); }
+
+.stage-maze .mz-wrap { flex: 1; height: auto; }
+.mz-board-wrap { position: relative; height: 100%; }
+.arena.no-q { grid-template-rows: 1fr auto; }

@@ -11,8 +11,9 @@ import { ITEM_BY_ID, isFree } from './items.js';
 import raid from './modes/raid.js';
 import corners from './modes/corners.js';
 import treasure from './modes/treasure.js';
+import maze from './modes/maze.js';
 
-export const MODES = { raid, corners, treasure };
+export const MODES = { raid, corners, treasure, maze };
 const params = new URLSearchParams(location.search);
 const set = getSet(params.get('set'));
 const mode = MODES[params.get('game')] || raid;
@@ -28,6 +29,7 @@ const G = {
 };
 let net = null;
 const heroEls = new Map();
+if (params.has('debug')) window.__wr = { G }; // for automated tests only
 
 // ---------------- Helpers shared with the game modes ----------------
 function later(fn, ms) { const t = setTimeout(fn, ms); G.timers.push(t); return t; }
@@ -89,10 +91,11 @@ const ctx = {
 
 // ---------------- Networking ----------------
 const send = m => { try { net && net.send(m); } catch (e) { console.warn(e); } };
+ctx.send = send;
 
 function stateMsg() {
   const s = { t: 'state', mode: mode.id, scoreName: mode.scoreName, phase: G.phase, qi: G.qi, total: G.qs.length, stats: {}, change: !!mode.allowChange };
-  for (const p of G.players.values()) if (!p.bot) s.stats[p.id] = [p.score, p.correct, p.streak, mode.tag ? mode.tag(ctx, p) : ''];
+  for (const p of G.players.values()) if (!p.bot) s.stats[p.id] = [p.score, p.correct, p.streak, mode.tag ? mode.tag(ctx, p) : '', mode.selfPaced ? (p.asked || 0) : null];
   if (G.qs[G.qi] && ['question', 'reveal', 'dig', 'dug'].includes(G.phase)) {
     const q = G.qs[G.qi];
     s.q = { prompt: q.prompt, choices: q.choices };
@@ -155,6 +158,7 @@ function handleJoin(m) {
   if (uid && G.teacher && !p.owned) loadOwned(p);
   renderRoster();
   if (G.phase !== 'lobby' && mode.renderPlayers) mode.renderPlayers(ctx);
+  if (G.phase !== 'lobby' && mode.rejoin) mode.rejoin(ctx, p);
 }
 
 function handleAns(m) {
@@ -258,6 +262,8 @@ function setupLobby() {
   $('#emoteToggle').onclick = () => { S.emotes = S.emotes === false; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); };
   refreshEmoteToggle();
   if (mode.settings) mode.settings(ctx, $('#modeSettings'), () => save('cq_host_settings', S));
+  // Self-paced games (the maze) don't use a shared question timer.
+  if (mode.selfPaced) ['#setTime', '#setCount', '#setAuto'].forEach(sel => ($(sel).closest('label').hidden = true));
   loadQR(joinBase + '?join=' + code);
 }
 
@@ -341,6 +347,8 @@ async function startGame() {
   ctx.stage.innerHTML = '';
   ctx.stage.className = 'stage stage-' + mode.id;
   $('#hChoices').hidden = mode.showChoices === false;
+  $('#qpanel').hidden = !!mode.selfPaced;
+  $('#gameScreen .arena').classList.toggle('no-q', !!mode.selfPaced);
   $('#qText').textContent = ''; $('#hChoices').innerHTML = ''; $('#statusLine').textContent = ''; $('#roundMsg').textContent = '';
   $('#nextBtn').hidden = true; $('#skipBtn').hidden = true;
   mode.mount(ctx);
@@ -348,7 +356,17 @@ async function startGame() {
   show('gameScreen');
   broadcast();
   await mode.start(ctx);
-  if (flow === G.flow) nextQuestion();
+  if (flow !== G.flow) return;
+  if (mode.selfPaced) {
+    // Everyone plays at their own pace (e.g. the maze); the mode runs until it's over.
+    G.phase = 'play';
+    $('#qCounter').textContent = mode.name;
+    broadcast();
+    await mode.run(ctx);
+    if (flow === G.flow) endGame();
+    return;
+  }
+  nextQuestion();
 }
 
 function renderChoices(q) {
@@ -518,7 +536,7 @@ async function saveResults(list, coins) {
   // Places are counted among real players (test bots don't count).
   const humans = list.filter(p => !p.bot);
   const results = humans.map((p, i) => ({ p, rank: i + 1 })).filter(x => x.p.uid).map(({ p, rank }) => ({
-    uid: p.uid, score: p.score, correct: p.correct, answered: p.answered || 0, total: asked, rank, players: humans.length,
+    uid: p.uid, score: p.score, correct: p.correct, answered: p.answered || 0, total: mode.selfPaced ? (p.asked || 0) : asked, rank, players: humans.length,
     coins: coins[p.id] || 0, missed: p.missed || [],
   }));
   try {

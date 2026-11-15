@@ -99,6 +99,21 @@
   <div class="dig-grid" id="digGrid"></div>
 </section>
 
+<section id="s-maze" class="screen play maze-screen">
+  <div class="mz-hud"><span class="hearts" id="mzHearts"></span><span id="mzTime"></span><span id="mzScore"></span></div>
+  <div class="card mz-msg" id="mzMsg">Use the arrows to move your hero. Watch the big screen!</div>
+  <div class="dpad" id="dpad">
+    <button data-d="u" aria-label="Up">▲</button><button data-d="l" aria-label="Left">◀</button>
+    <div class="mid"><div style="width:90px;height:84px" id="mzHero"></div></div>
+    <button data-d="r" aria-label="Right">▶</button><button data-d="d" aria-label="Down">▼</button>
+  </div>
+  <div class="mz-q" id="mzQ" hidden>
+    <div class="kind" id="mzKind"></div>
+    <div class="card q-prompt" id="mzPrompt"></div>
+    <div class="p-choices" id="mzChoices"></div>
+  </div>
+</section>
+
 <section id="s-msg" class="screen play">
   <h2 id="msgText" style="margin:0"></h2>
   <button class="btn primary" id="msgBtn">OK</button>

@@ -177,6 +177,8 @@ function onMsg(m) {
     } else {
       joined = false; $('#joinErr').textContent = m.reason || 'Could not join.'; show('s-join');
     }
+  } else if (m.t === 'mq' || m.t === 'mres') {
+    if (joined) mazeMsg(m);
   } else if (m.t === 'kicked') {
     joined = false; message('Your teacher removed you from this game.');
   } else if (m.t === 'state') {
@@ -194,6 +196,7 @@ const GAME_TEXT = {
   raid: { intro: 'The boss is here!', right: 'HIT!', wrong: 'Missed!' },
   corners: { intro: 'Get ready to run!', right: 'SAFE!', wrong: 'LAVA!' },
   treasure: { intro: 'Treasure Hunt!', right: 'CORRECT!', wrong: 'Not quite!' },
+  maze: { intro: 'A wild Mr. C appeared!', right: 'CORRECT!', wrong: 'Not quite!' },
 };
 const text = s => GAME_TEXT[s.mode] || GAME_TEXT.raid;
 
@@ -260,6 +263,8 @@ function render(s) {
       shownKey = key;
       renderQuestion(s);
     }
+  } else if (s.phase === 'play') {
+    renderMaze(s);
   } else if (s.phase === 'reveal') {
     if (shownKey === key) return;
     shownKey = key;
@@ -381,13 +386,86 @@ function renderEnd(s) {
   $('#endSub').textContent = s.sub || '';
   $('#endRank').textContent = rank ? `#${rank} of ${s.ranks.length}` : '-';
   $('#endDmg').textContent = fmt(score);
-  $('#endCorrect').textContent = `${correct} / ${s.total}`;
+  const asked = myStats(s)[4];
+  $('#endCorrect').textContent = `${correct} / ${asked ?? s.total}`;
   const coins = s.coins && s.coins[pid];
   $('#endCoins').innerHTML = coins
     ? `<div class="coin-pill" style="font-size:1rem">🪙 +${fmt(coins)} coins!</div><p><a class="btn primary" href="shop.html">Visit the shop</a></p>`
     : !account ? '<p class="muted">Sign in with Google next time to earn coins for the shop!</p>' : '';
   show('s-end');
 }
+
+// ---------------- Mr. C's Maze: arrow pad + personal questions ----------------
+let mzToken = null, mzDir = null, mzRefresh = null, mzDone = false, mzEnd = 0, mzClock = null;
+function renderMaze(s) {
+  const [score, , , tag] = myStats(s);
+  $('#mzHearts').textContent = tag || '';
+  $('#mzScore').textContent = `${fmt(score)} pts`;
+  if (s.left !== undefined) mzEnd = performance.now() + s.left;
+  if (shownKey !== 'play') {
+    shownKey = 'play';
+    mzDone = false; mzToken = null;
+    $('#mzHero').innerHTML = avatarSVG(profile.av);
+    $('#mzQ').hidden = true; $('#dpad').hidden = false;
+    $('#mzMsg').className = 'card mz-msg';
+    $('#mzMsg').textContent = 'Use the arrows to move your hero through the maze. Watch the big screen!';
+    show('s-maze');
+    clearInterval(mzClock);
+    mzClock = setInterval(() => {
+      const left = Math.max(0, mzEnd - performance.now());
+      $('#mzTime').textContent = `⏱ ${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+      if (!$('#s-maze').classList.contains('active')) clearInterval(mzClock);
+    }, 500);
+  }
+}
+
+function setDir(d) {
+  if (d === mzDir) return;
+  mzDir = d;
+  document.querySelectorAll('#dpad button').forEach(b => b.classList.toggle('held', b.dataset.d === d));
+  toHost({ t: 'dir', id: pid, d });
+  clearInterval(mzRefresh);
+  if (d) mzRefresh = setInterval(() => toHost({ t: 'dir', id: pid, d: mzDir }), 1000); // keeps walking while held
+}
+const dpad = $('#dpad');
+dpad.addEventListener('pointerdown', e => { const b = e.target.closest('[data-d]'); if (!b) return; e.preventDefault(); b.setPointerCapture?.(e.pointerId); setDir(b.dataset.d); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => dpad.addEventListener(ev, () => setDir(null)));
+dpad.addEventListener('contextmenu', e => e.preventDefault());
+const KEYS = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', w: 'u', s: 'd', a: 'l', d: 'r' };
+document.addEventListener('keydown', e => { if ($('#s-maze').classList.contains('active') && KEYS[e.key] && !$('#dpad').hidden) { e.preventDefault(); setDir(KEYS[e.key]); } });
+document.addEventListener('keyup', e => { if (KEYS[e.key] && KEYS[e.key] === mzDir) setDir(null); });
+
+function mazeMsg(m) {
+  if (!$('#s-maze').classList.contains('active')) { shownKey = null; renderMaze(last || { phase: 'play' }); }
+  if (m.t === 'mq') {
+    setDir(null);
+    mzToken = m.k;
+    $('#dpad').hidden = true;
+    $('#mzQ').hidden = false;
+    $('#mzKind').textContent = m.kind === 'fight' ? '⚔ MR. C ATTACKS! Answer to fight back!' : '🔒 LOCKED GATE: answer to open it';
+    $('#mzKind').className = 'kind ' + (m.kind === 'fight' ? 'fight' : '');
+    $('#mzPrompt').textContent = m.q.prompt;
+    $('#mzChoices').innerHTML = m.q.choices.map((c, i) =>
+      `<button class="choice ${CHOICE_STYLE[i].cls}" data-c="${i}"><span class="ico">${CHOICE_STYLE[i].icon}</span><span>${esc(c)}</span></button>`).join('');
+    $('#mzMsg').className = 'card mz-msg ' + (m.kind === 'fight' ? 'bad' : '');
+    $('#mzMsg').textContent = m.kind === 'fight' ? 'Battle! Get it right to bonk Mr. C away!' : 'Answer correctly to unlock this gate.';
+  } else {
+    mzToken = null;
+    $('#mzQ').hidden = true;
+    $('#mzMsg').className = 'card mz-msg ' + (m.ok ? 'good' : 'bad');
+    $('#mzMsg').textContent = m.line;
+    $('#mzHearts').textContent = '♥'.repeat(m.hp || 0) + '♡'.repeat(Math.max(0, 3 - (m.hp || 0)));
+    $('#mzScore').textContent = `${fmt(m.score || 0)} pts`;
+    if (m.done) { mzDone = true; $('#dpad').hidden = true; setDir(null); }
+    else $('#dpad').hidden = false;
+  }
+}
+$('#mzChoices').addEventListener('click', e => {
+  const b = e.target.closest('.choice'); if (!b || !mzToken) return;
+  toHost({ t: 'mans', id: pid, k: mzToken, c: +b.dataset.c });
+  document.querySelectorAll('#mzChoices .choice').forEach(x => (x.disabled = true));
+  b.classList.add('picked');
+});
 
 // ---------------- iPad niceties ----------------
 let wakeLock = null;
