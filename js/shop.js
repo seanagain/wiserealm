@@ -2,7 +2,8 @@
 // The database checks every purchase and only lets a hero wear items it owns.
 import { $, $$, esc, fmt } from './common.js';
 import { accounts } from './supa.js';
-import { ITEMS, ITEM_BY_ID, SLOTS } from './items.js';
+import { ITEMS, ITEM_BY_ID, SLOTS, isFree } from './items.js';
+import { bubbleHTML, playEmote } from './emotes.js';
 import { avatarSVG, normalizeAvatar, restrictAvatar, SKINS, COLORS, HATS, FACES, CLASSES, STYLES } from './avatar.js';
 
 let prof = null;      // saved profile from the server
@@ -19,7 +20,7 @@ const FREE = [
   { key: 'face', title: 'Face', items: FACES.map(f => f.label) },
 ];
 
-const owned = id => prof.owned.includes(id);
+const owned = id => isFree(ITEM_BY_ID[id]) || prof.owned.includes(id);
 const savedHero = () => restrictAvatar(prof.avatar, prof.owned);
 const dirty = () => JSON.stringify(restrictAvatar(draft, prof.owned)) !== JSON.stringify(savedHero()) || tryingUnowned();
 const tryingUnowned = () => ITEMS.some(it => draft[it.slot] === it.id && !owned(it.id));
@@ -45,7 +46,17 @@ function renderLook() {
     </div></div>`).join('') + '<p class="muted">Want more? Visit the <b>Shop</b> tab for hats, outfits, capes, face items and pets.</p>';
 }
 
+function emoteCard(it) {
+  const action = owned(it.id)
+    ? `<div class="owned">${isFree(it) ? 'FREE · YOURS' : 'OWNED'}</div>`
+    : `<div class="price">🪙 ${fmt(it.price)}</div><button class="btn small primary" data-buy="${it.id}" ${prof.coins < it.price ? 'disabled' : ''}>Buy · ${fmt(it.price)}</button>`;
+  return `<div class="item" data-emote="${it.id}" title="Tap to preview">
+    <div class="emote-preview"><div class="pic" style="width:90px;height:84px">${avatarSVG(draft)}</div>${bubbleHTML(it.id)}</div>
+    <div class="nm">${esc(it.name)}</div>${action}</div>`;
+}
+
 function itemCard(it) {
+  if (it.slot === 'emote') return emoteCard(it);
   const preview = avatarSVG(Object.assign({}, draft, { [it.slot]: it.id }));
   const wearing = draft[it.slot] === it.id;
   let action;
@@ -88,6 +99,7 @@ $('#panel').addEventListener('click', async e => {
     buy.disabled = true;
     try {
       prof = await accounts.buy(it.id);
+      if (it.slot === 'emote') { render(); note(`You bought the ${it.name} emote! Use it between questions in games. 🎉`); return; }
       draft[it.slot] = it.id;
       await saveHero(`You bought ${it.name}! 🎉`);
     } catch (err) { note(err.message, false); buy.disabled = false; }
@@ -97,6 +109,13 @@ $('#panel').addEventListener('click', async e => {
   if (eq) { const it = ITEM_BY_ID[eq.dataset.equip]; draft[it.slot] = it.id; return render(); }
   const un = e.target.closest('[data-unequip]');
   if (un) { draft[un.dataset.unequip] = null; return render(); }
+  const em = e.target.closest('[data-emote]');
+  if (em) { // replay the emote animation on the little hero
+    const host = em.querySelector('.emote-preview');
+    host.querySelectorAll('.emote-bubble').forEach(b => b.remove());
+    playEmote(host, em.dataset.emote);
+    return;
+  }
   const card = e.target.closest('[data-try]');
   if (card) { // try it on (tap again to take it off)
     const it = ITEM_BY_ID[card.dataset.try];

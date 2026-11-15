@@ -78,6 +78,7 @@ function melody(notes, { at = 0, beat = 0.1, ...opts } = {}) {
 }
 
 const SFX = {
+  emote() { tone(hz('E6'), 0, 0.05, { wave: 'p12', vol: 0.06, hold: true }); tone(hz('A6'), 0.05, 0.09, { wave: 'p12', vol: 0.06 }); },
   join() { tone(hz('B5'), 0, 0.06, { wave: 'p25', vol: 0.1, hold: true }); tone(hz('E6'), 0.06, 0.3, { wave: 'p25', vol: 0.1 }); },
   tick() { tone(hz('A6'), 0, 0.04, { wave: 'p50', vol: 0.06, hold: true }); },
   start() { melody([['C5', 1], ['E5', 1], ['G5', 1], ['C6', 2]], { beat: 0.05, wave: 'p25', vol: 0.1 }); },

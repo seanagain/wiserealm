@@ -12,6 +12,7 @@ export const SLOTS = [
   { id: 'cape', label: 'Capes' },
   { id: 'acc', label: 'Face' },
   { id: 'pet', label: 'Pets' },
+  { id: 'emote', label: 'Emotes' },
 ];
 
 const cape = (id, name, price, X, x, trim) => ({
@@ -101,4 +102,25 @@ export const ITEMS = [
     '.K.....', 'KrK.KK.', 'KRRKRRK', 'KRWERRK', '.KRRRYK', 'KRRRRK.', 'KRKKRK.', '.K..K..'] },
 ];
 
+// ---------- Emotes: reactions students can send between questions ----------
+// Price 0 = free for everyone. `fx` picks the animation in css/style.css (.fx-*).
+const emote = (id, name, price, text, fx) => ({ id, slot: 'emote', name, price, text, fx });
+ITEMS.push(
+  emote('emote_hi', 'Hi!', 0, 'Hi! 👋', 'wave'),
+  emote('emote_gg', 'GG', 0, 'GG', 'pop'),
+  emote('emote_nice', 'Nice one!', 0, 'Nice one!', 'pop'),
+  emote('emote_67', '67', 150, '67', 'sixseven'),
+  emote('emote_sheesh', 'Sheesh', 100, 'SHEEESH', 'stretch'),
+  emote('emote_bruh', 'Bruh', 80, 'bruh.', 'deadpan'),
+  emote('emote_oof', 'Oof', 60, 'OOF', 'drop'),
+  emote('emote_bigbrain', 'Big Brain', 120, 'BIG BRAIN 🧠', 'pulse'),
+  emote('emote_letsgo', 'Let’s Go', 100, 'LET’S GOOO!', 'shake'),
+  emote('emote_aura', '+1000 Aura', 200, '+1000 AURA', 'glow'),
+  emote('emote_thanks', 'Thank You', 90, 'THANK YOU! ❤', 'hearts'),
+  emote('emote_hype', 'Hype', 250, 'HYPE!!', 'confetti'),
+  emote('emote_dance', 'Victory Dance', 300, '♪ ♫ ♪', 'dance'),
+);
+
 export const ITEM_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+export const EMOTES = ITEMS.filter(i => i.slot === 'emote');
+export const isFree = it => it && it.price === 0;

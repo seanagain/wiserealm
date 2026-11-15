@@ -393,3 +393,56 @@ dialog.wide { width: min(900px, calc(100vw - 32px)); max-height: 88vh; }
 
 dialog { background: var(--panel); color: var(--text); border: 4px solid var(--frame); box-shadow: 0 0 0 4px var(--ink); border-radius: 0; padding: 22px; }
 .spark .base { stroke: var(--line); stroke-width: 1; }
+
+/* ===================== Emotes ===================== */
+.emote-bubble {
+  position: absolute; left: 50%; bottom: 96%; transform: translateX(-50%); z-index: 15; pointer-events: none;
+  background: #fff; color: var(--ink); font-family: var(--pixel); font-size: 13px; line-height: 1.3; padding: 6px 9px;
+  border: 3px solid var(--ink); white-space: nowrap; box-shadow: 3px 3px 0 rgba(0, 0, 0, .4);
+  animation: emoteLife 2.6s steps(10) forwards;
+}
+.emote-bubble::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -6px; border: 6px solid transparent; border-top-color: var(--ink); }
+@keyframes emoteLife { 0% { opacity: 0; transform: translateX(-50%) scale(.4); } 10% { opacity: 1; transform: translateX(-50%) scale(1.1); } 15%, 85% { opacity: 1; transform: translateX(-50%) scale(1); } 100% { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+.emote-bubble span { display: inline-block; }
+.fx-sixseven .s6 { animation: handUp .36s steps(2) infinite; }
+.fx-sixseven .s7 { animation: handUp .36s steps(2) infinite reverse; }
+.fx-sixseven .hands { animation: handUp .36s steps(2) infinite; animation-delay: .18s; margin: 0 4px; }
+@keyframes handUp { 50% { transform: translateY(-6px); } }
+.fx-stretch span { animation: stretchy .6s steps(3) infinite alternate; }
+@keyframes stretchy { to { transform: scaleX(1.5); } }
+.fx-shake { animation: emoteLife 2.6s steps(10) forwards, emoteShake .2s steps(2) 8; }
+@keyframes emoteShake { 50% { margin-left: 4px; } }
+.fx-pulse { animation: emoteLife 2.6s steps(10) forwards, emotePulse .5s steps(2) 5; }
+@keyframes emotePulse { 50% { font-size: 15px; } }
+.fx-glow { background: var(--gold); box-shadow: 0 0 0 3px #fff3b0, 0 0 18px 6px rgba(255, 210, 63, .8); }
+.fx-deadpan { background: #c9c9d6; color: #4a4a5a; font-size: 11px; }
+.fx-drop { animation: emoteDrop 2.6s steps(12) forwards; }
+@keyframes emoteDrop { 0% { opacity: 0; transform: translateX(-50%) translateY(-40px); } 15% { opacity: 1; transform: translateX(-50%) translateY(6px); } 22%, 85% { opacity: 1; transform: translateX(-50%) translateY(0); } 100% { opacity: 0; transform: translateX(-50%); } }
+.fx-hearts { background: #ffd6e0; }
+.fx-confetti { background: linear-gradient(90deg, #ffd23f, #ff8fab, #4cc9f0); }
+.fx-wave { background: #e3f8ff; }
+.emote-dance { animation: danceStep .5s steps(2) 5 !important; }
+@keyframes danceStep { 25% { transform: translateX(-8px) rotate(-6deg); } 75% { transform: translateX(8px) rotate(6deg); } }
+.emote-particle { position: absolute; z-index: 30; width: 8px; height: 8px; pointer-events: none; font-size: 16px; line-height: 8px; }
+.emote-feed { position: fixed; right: 16px; bottom: 90px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; z-index: 20; pointer-events: none; }
+.emote-feed .feed-row { position: relative; display: flex; align-items: center; gap: 8px; background: rgba(18, 15, 36, .85); border: 2px solid var(--line); padding: 4px 8px; animation: pop .3s steps(3); }
+.emote-feed .feed-row .emote-bubble { position: static; transform: none; animation: none; }
+.emote-feed .feed-row .emote-bubble::after { display: none; }
+.emote-bar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 25; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  max-width: calc(100vw - 24px); padding: 8px; background: rgba(18, 15, 36, .92); border: 3px solid var(--frame); box-shadow: 0 0 0 3px var(--ink); }
+.emote-bar button { font-family: var(--pixel); font-size: 10px; padding: 8px 10px; background: #fff; color: var(--ink); border: 3px solid var(--ink); border-radius: 0; box-shadow: inset -3px -3px 0 rgba(0,0,0,.15); }
+.emote-bar button:disabled { opacity: .45; }
+.emote-bar .hint { color: var(--muted); font-size: .8rem; align-self: center; }
+.emote-preview { position: relative; height: 110px; width: 120px; display: grid; place-items: end center; }
+.emote-preview .emote-bubble { animation: none; bottom: 30%; }
+.emote-preview .emote-bubble.fx-shake { animation: emoteShake .2s steps(2) infinite; }
+.emote-preview .emote-bubble.fx-pulse { animation: emotePulse .5s steps(2) infinite; }
+.emote-preview .emote-bubble.fx-drop { animation: none; }
+
+.t-acct { padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.t-acct .grow { flex: 1; min-width: 200px; }
+.sync-pill { font-size: .85rem; padding: 3px 10px; border: 2px solid var(--line); background: var(--ink); }
+.sync-pill.synced { border-color: var(--good); color: var(--good); }
+.sync-pill.saving { border-color: var(--gold); color: var(--gold); }
+.sync-pill.offline, .sync-pill.local { border-color: var(--bad); color: #ffb3bf; }
+.roster { padding-top: 48px; }

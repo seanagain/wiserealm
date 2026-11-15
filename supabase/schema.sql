@@ -523,6 +523,91 @@ grant execute on function public.create_class(text), public.update_class(uuid, t
   public.record_game(text, integer, uuid, text, text, jsonb, jsonb), public.class_overview(uuid), public.class_sessions(uuid),
   public.session_detail(bigint), public.class_hard_questions(uuid), public.student_detail(uuid, uuid) to authenticated;
 
+-- ================= Teacher accounts: question sets & colleagues =================
+create table if not exists public.question_sets (
+  id text primary key,
+  teacher_id uuid not null references auth.users (id) on delete cascade,
+  title text not null default 'Untitled set',
+  items jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create index if not exists question_sets_teacher on public.question_sets (teacher_id);
+alter table public.question_sets enable row level security;
+
+create or replace function public.list_sets()
+returns table (id text, title text, items jsonb, updated_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  return query select q.id, q.title, q.items, q.updated_at from public.question_sets q
+    where q.teacher_id = auth.uid() order by q.updated_at desc;
+end $$;
+
+create or replace function public.save_set(p_id text, p_title text, p_items jsonb) returns timestamptz
+language plpgsql security definer set search_path = public as $$
+declare owner uuid; t timestamptz := now();
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  if p_id is null or length(p_id) > 40 then raise exception 'Invalid set id'; end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) > 1000 or length(p_items::text) > 400000 then
+    raise exception 'That set is too big (max 1000 questions)';
+  end if;
+  select teacher_id into owner from public.question_sets where id = p_id;
+  if found and owner <> auth.uid() then raise exception 'Not your set'; end if;
+  insert into public.question_sets (id, teacher_id, title, items, updated_at)
+  values (p_id, auth.uid(), left(coalesce(nullif(trim(p_title), ''), 'Untitled set'), 120), p_items, t)
+  on conflict (id) do update set title = excluded.title, items = excluded.items, updated_at = t;
+  return t;
+end $$;
+
+create or replace function public.delete_set(p_id text) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  delete from public.question_sets where id = p_id and teacher_id = auth.uid();
+  return true;
+end $$;
+
+-- Teachers can add colleagues (who then get their own separate classes and sets).
+create or replace function public.list_teachers() returns table (email text, signed_up boolean)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  return query select t.email, exists (select 1 from auth.users u where lower(u.email) = lower(t.email)) from public.teachers t order by t.email;
+end $$;
+
+create or replace function public.add_teacher(p_email text) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare e text := lower(trim(p_email));
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  if e !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'That doesn''t look like an email address'; end if;
+  insert into public.teachers (email) values (e) on conflict do nothing;
+  return true;
+end $$;
+
+create or replace function public.remove_teacher(p_email text) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  if lower(trim(p_email)) = lower(coalesce(auth.jwt() ->> 'email', '')) then raise exception 'You can''t remove yourself'; end if;
+  delete from public.teachers where lower(email) = lower(trim(p_email));
+  return true;
+end $$;
+
+-- Which shop items (e.g. emotes) the players in my game own, so the projector only shows real ones.
+create or replace function public.players_owned(p_users uuid[]) returns table (id uuid, owned text[])
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  return query select p.id, p.owned from public.profiles p where p.id = any (p_users);
+end $$;
+
+revoke all on function public.list_sets(), public.save_set(text, text, jsonb), public.delete_set(text), public.list_teachers(),
+  public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]) from public, anon;
+grant execute on function public.list_sets(), public.save_set(text, text, jsonb), public.delete_set(text), public.list_teachers(),
+  public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]) to authenticated;
+
 -- ---------- Shop catalog (generated from js/items.js by tools/gen-shop-sql.mjs) ----------
 -- BEGIN SHOP ITEMS
 insert into public.shop_items (id, slot, name, price) values
@@ -555,7 +640,20 @@ insert into public.shop_items (id, slot, name, price) values
   ('pet_cat', 'pet', 'Cat', 200),
   ('pet_owl', 'pet', 'Owl', 250),
   ('pet_duck', 'pet', 'Duck', 120),
-  ('pet_dragon', 'pet', 'Baby Dragon', 400)
+  ('pet_dragon', 'pet', 'Baby Dragon', 400),
+  ('emote_hi', 'emote', 'Hi!', 0),
+  ('emote_gg', 'emote', 'GG', 0),
+  ('emote_nice', 'emote', 'Nice one!', 0),
+  ('emote_67', 'emote', '67', 150),
+  ('emote_sheesh', 'emote', 'Sheesh', 100),
+  ('emote_bruh', 'emote', 'Bruh', 80),
+  ('emote_oof', 'emote', 'Oof', 60),
+  ('emote_bigbrain', 'emote', 'Big Brain', 120),
+  ('emote_letsgo', 'emote', 'Let’s Go', 100),
+  ('emote_aura', 'emote', '+1000 Aura', 200),
+  ('emote_thanks', 'emote', 'Thank You', 90),
+  ('emote_hype', 'emote', 'Hype', 250),
+  ('emote_dance', 'emote', 'Victory Dance', 300)
 on conflict (id) do update set slot = excluded.slot, name = excluded.name, price = excluded.price;
-delete from public.shop_items where id not in ('hat_top', 'hat_pirate', 'hat_viking', 'hat_chef', 'hat_frog', 'hat_halo', 'hat_flowers', 'hat_dragon', 'top_armor', 'top_tux', 'top_robe', 'top_jersey', 'top_hawaii', 'top_hoodie', 'cape_red', 'cape_royal', 'cape_shadow', 'cape_ice', 'cape_gold', 'acc_glasses', 'acc_patch', 'acc_stache', 'acc_mask', 'acc_monocle', 'acc_shades', 'pet_slime', 'pet_cat', 'pet_owl', 'pet_duck', 'pet_dragon');
+delete from public.shop_items where id not in ('hat_top', 'hat_pirate', 'hat_viking', 'hat_chef', 'hat_frog', 'hat_halo', 'hat_flowers', 'hat_dragon', 'top_armor', 'top_tux', 'top_robe', 'top_jersey', 'top_hawaii', 'top_hoodie', 'cape_red', 'cape_royal', 'cape_shadow', 'cape_ice', 'cape_gold', 'acc_glasses', 'acc_patch', 'acc_stache', 'acc_mask', 'acc_monocle', 'acc_shades', 'pet_slime', 'pet_cat', 'pet_owl', 'pet_duck', 'pet_dragon', 'emote_hi', 'emote_gg', 'emote_nice', 'emote_67', 'emote_sheesh', 'emote_bruh', 'emote_oof', 'emote_bigbrain', 'emote_letsgo', 'emote_aura', 'emote_thanks', 'emote_hype', 'emote_dance');
 -- END SHOP ITEMS

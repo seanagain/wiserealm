@@ -6,6 +6,8 @@ import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
 import { avatarSVG, normalizeAvatar, avatarColor, randomAvatar } from './avatar.js';
 import { sfx, isMuted, setMuted } from './sound.js';
+import { playEmote, bubbleHTML } from './emotes.js';
+import { ITEM_BY_ID, isFree } from './items.js';
 import raid from './modes/raid.js';
 import corners from './modes/corners.js';
 import treasure from './modes/treasure.js';
@@ -14,7 +16,7 @@ export const MODES = { raid, corners, treasure };
 const params = new URLSearchParams(location.search);
 const set = getSet(params.get('set'));
 const mode = MODES[params.get('game')] || raid;
-const S = Object.assign({ time: 20, count: 0, auto: false, flip: false }, load('cq_host_settings', {}));
+const S = Object.assign({ time: 20, count: 0, auto: false, flip: false, emotes: true }, load('cq_host_settings', {}));
 const code = String(10000 + Math.floor(Math.random() * 90000));
 const joinBase = new URL('./', location.href).href;
 
@@ -107,6 +109,7 @@ function stateMsg() {
   }
   if (mode.publicState) Object.assign(s, mode.publicState(ctx));
   s.hud = mode.hud ? mode.hud(ctx) : '';
+  s.emotes = S.emotes !== false;
   return s;
 }
 function broadcast() { send(stateMsg()); }
@@ -116,6 +119,7 @@ function onMsg(m) {
   if (m.t === 'join') handleJoin(m);
   else if (m.t === 'ans') handleAns(m);
   else if (m.t === 'sync') resync();
+  else if (m.t === 'emote') handleEmote(m);
   else if (mode.onMessage) mode.onMessage(ctx, m);
 }
 
@@ -148,6 +152,7 @@ function handleJoin(m) {
     sfx('join');
   } else { p.name = name; p.av = normalizeAvatar(m.av); p.uid = uid || p.uid; }
   send({ t: 'joined', to: id, ok: true, name, coinsOn: G.teacher, state: stateMsg() });
+  if (uid && G.teacher && !p.owned) loadOwned(p);
   renderRoster();
   if (G.phase !== 'lobby' && mode.renderPlayers) mode.renderPlayers(ctx);
 }
@@ -169,6 +174,44 @@ function handleAns(m) {
     later(() => { if (G.phase === 'question' && G.qi === qi) endQuestion(); }, 700);
   }
 }
+
+// ---------------- Emotes ----------------
+// Students can only use free emotes and ones they really own (checked against the database).
+async function loadOwned(p) {
+  p.owned = [];
+  try { const rows = await accounts.playersOwned([p.uid]); p.owned = (rows[0] && rows[0].owned) || []; } catch (e) { console.warn(e); }
+}
+const EMOTE_PHASES = ['lobby', 'intro', 'reveal', 'dug', 'end'];
+const recentEmotes = [];
+function handleEmote(m) {
+  if (S.emotes === false || !EMOTE_PHASES.includes(G.phase)) return;
+  const p = G.players.get(m.id), e = ITEM_BY_ID[m.e];
+  if (!p || !e || e.slot !== 'emote') return;
+  if (!isFree(e) && !(p.owned || []).includes(e.id)) return;
+  const now = performance.now();
+  if (p.lastEmote && now - p.lastEmote < 2500) return;          // one every few seconds per student
+  while (recentEmotes.length && now - recentEmotes[0] > 2000) recentEmotes.shift();
+  if (recentEmotes.length >= 8) return;                         // and not too many at once overall
+  p.lastEmote = now; recentEmotes.push(now);
+  showEmote(p, e.id);
+}
+function showEmote(p, id) {
+  sfx('emote');
+  let el = null;
+  if ($('#gameScreen').classList.contains('active')) el = heroEls.get(p.id);
+  else if ($('#lobbyScreen').classList.contains('active')) el = $(`#roster .hero[data-id="${CSS.escape(p.id)}"]`);
+  if (el && el.offsetParent) return playEmote(el, id);
+  // No hero on screen (e.g. Treasure Hunt or the results screen): show it in a corner feed.
+  let feed = $('#emoteFeed');
+  if (!feed) { feed = document.createElement('div'); feed.id = 'emoteFeed'; feed.className = 'emote-feed'; document.body.append(feed); }
+  const row = document.createElement('div');
+  row.className = 'feed-row';
+  row.innerHTML = `<b>${esc(p.name)}</b>${bubbleHTML(id)}`;
+  feed.append(row);
+  while (feed.children.length > 5) feed.firstChild.remove();
+  setTimeout(() => row.remove(), 3000);
+}
+function refreshEmoteToggle() { $('#emoteToggle').textContent = S.emotes === false ? '😶 Emotes off' : '😀 Emotes on'; $('#setEmotes').checked = S.emotes !== false; }
 
 function fail(msg) { $('#errMsg').textContent = msg; show('errScreen'); }
 
@@ -211,6 +254,9 @@ function setupLobby() {
     save('cq_host_settings', S);
   };
   ['#setTime', '#setCount', '#setFlip', '#setAuto'].forEach(s => $(s).addEventListener('change', persist));
+  $('#setEmotes').addEventListener('change', () => { S.emotes = $('#setEmotes').checked; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); });
+  $('#emoteToggle').onclick = () => { S.emotes = S.emotes === false; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); };
+  refreshEmoteToggle();
   if (mode.settings) mode.settings(ctx, $('#modeSettings'), () => save('cq_host_settings', S));
   loadQR(joinBase + '?join=' + code);
 }
@@ -246,6 +292,7 @@ async function setupTeacher() {
     }
     await accounts.createGame(code, mode.id);
     G.teacher = true;
+    for (const p of G.players.values()) if (p.uid && !p.owned) loadOwned(p);
     const classes = (await accounts.teacherClasses().catch(() => [])).filter(c => !c.archived);
     if (!classes.some(c => c.id === S.classId)) S.classId = '';
     box.innerHTML = `<b style="color:var(--good)">Coins &amp; progress: on</b><br><span class="muted">Signed-in students earn coins and their results are saved.${accounts.mode === 'demo' ? ' (Preview mode)' : ''}</span>

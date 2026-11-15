@@ -50,6 +50,24 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 - Students see their own stats, accuracy chart, recent games and achievement badges on **My profile**.
 - Only signed-in students are tracked; guests can play but nothing is saved for them.
 
+## Teacher account
+
+- Sign in at the top of the teacher page. Your **question sets are saved to your account**
+  and appear on any computer where you sign in (the first time you sign in, sets already on
+  that computer are uploaded). The badge shows "☁ Saved to your account".
+- **Add colleagues:** Classes & progress → **Teachers** → type their email. Each teacher only
+  sees their own classes, students' progress and question sets.
+
+## Emotes
+
+- Students can send emotes from their iPad **between questions only** (lobby, after each answer,
+  results). They pop up above their hero on the projector.
+- 3 are free for everyone (Hi!, GG, Nice one!); 10 more are in the shop (e.g. **67**, Sheesh, Bruh,
+  Big Brain, +1000 Aura, Victory Dance).
+- Limits: one emote every few seconds per student, a cap on how many show at once, and only
+  emotes a student really owns. Turn them off any time with **Student emotes** in the lobby or the
+  **😀 Emotes on/off** button during a game.
+
 ## Try it right now (Local Test Mode / Preview)
 
 Without Supabase settings, games only connect tabs in the same browser, and accounts run in

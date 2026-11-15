@@ -30,6 +30,8 @@ function friendly(err) {
   if (/provider is not enabled|unsupported provider/i.test(m)) return 'Google sign-in isn’t switched on yet. Ask your teacher.';
   if (/not a teacher/i.test(m)) return 'Only teachers can do that.';
   if (/no class with that code/i.test(m)) return 'No class found with that code. Check it with your teacher.';
+  if (/yourself/i.test(m)) return 'You can’t remove yourself.';
+  if (/look like an email/i.test(m)) return 'That doesn’t look like an email address.';
   return m || 'Something went wrong. Try again.';
 }
 
@@ -84,6 +86,14 @@ const online = {
   sessionDetail(id) { return this.rpc('session_detail', { p_session: id }); },
   hardQuestions(id) { return this.rpc('class_hard_questions', { p_class: id }); },
   studentDetail(cls, user) { return this.rpc('student_detail', { p_class: cls, p_user: user }); },
+  // teacher account: question sets & colleagues
+  listSets() { return this.rpc('list_sets'); },
+  saveSet(id, title, items) { return this.rpc('save_set', { p_id: id, p_title: title, p_items: items }); },
+  deleteSet(id) { return this.rpc('delete_set', { p_id: id }); },
+  listTeachers() { return this.rpc('list_teachers'); },
+  addTeacher(email) { return this.rpc('add_teacher', { p_email: email }); },
+  removeTeacher(email) { return this.rpc('remove_teacher', { p_email: email }); },
+  playersOwned(uids) { return uids.length ? this.rpc('players_owned', { p_users: uids }) : Promise.resolve([]); },
 };
 
 // ---------------- Preview (this device only) ----------------
@@ -119,6 +129,24 @@ const demo = {
   async students() { const p = demoProfile(); return [{ id: p.id, display_name: p.display_name, email: p.email, coins: p.coins, items: p.owned.length }]; },
   async giveCoins(_u, amount) { const p = demoProfile(); p.coins = Math.max(0, p.coins + (amount | 0)); save(DEMO_KEY, p); return p.coins; },
   ...demoClasses(),
+  // Preview "cloud": a second store on this device, so syncing can be tried out.
+  async listSets() { return load('wr_demo_cloud_sets', []); },
+  async saveSet(id, title, items) {
+    const all = load('wr_demo_cloud_sets', []).filter(x => x.id !== id);
+    const t = new Date().toISOString(); all.unshift({ id, title, items, updated_at: t }); save('wr_demo_cloud_sets', all); return t;
+  },
+  async deleteSet(id) { save('wr_demo_cloud_sets', load('wr_demo_cloud_sets', []).filter(x => x.id !== id)); return true; },
+  async listTeachers() { return load('wr_demo_teachers', [{ email: 'preview@wiserealm', signed_up: true }]); },
+  async addTeacher(email) {
+    const e = String(email).trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('That doesn’t look like an email address');
+    const all = await this.listTeachers(); if (!all.some(t => t.email === e)) all.push({ email: e, signed_up: false }); save('wr_demo_teachers', all); return true;
+  },
+  async removeTeacher(email) {
+    if (email === 'preview@wiserealm') throw new Error('You can’t remove yourself');
+    save('wr_demo_teachers', (await this.listTeachers()).filter(t => t.email !== email)); return true;
+  },
+  async playersOwned(uids) { const p = demoProfile(); return uids.includes(p.id) ? [{ id: p.id, owned: p.owned }] : []; },
 };
 
 // Preview-mode classes & progress, stored on this device. Mirrors supabase/schema.sql.

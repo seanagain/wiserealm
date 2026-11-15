@@ -1,6 +1,7 @@
 import { $, esc, show, uid, fmt } from './common.js';
 import { accounts } from './supa.js';
 import { showClasses } from './classes.js';
+import { startCloudSync } from './cloudsets.js';
 import { getSets, getSet, upsertSet, deleteSet, newSet, parseTable, rowsToItems, cleanItems } from './sets.js';
 import { isOnline } from './net.js';
 
@@ -215,6 +216,72 @@ $('#studentList').addEventListener('click', async e => {
 $('#studentsBtn').onclick = openStudents;
 $('#studentsBack').onclick = () => { renderLib(); show('lib'); };
 
+// ---------------- Teacher account (sign-in bar + saving sets to the account) ----------------
+const SYNC_TEXT = {
+  synced: '☁ Saved to your account', saving: '☁ Saving…', offline: '⚠ Not saved yet (offline). Will retry.',
+  local: 'Only on this computer',
+};
+function setSync(state) {
+  const pill = $('#syncPill'); if (!pill) return;
+  pill.className = 'sync-pill ' + state; pill.textContent = SYNC_TEXT[state];
+  $('#storageNote').innerHTML = state === 'local'
+    ? 'Your question sets are only saved in this browser. <b>Sign in</b> to save them to your account so they follow you to any computer (or use <b>Download backup</b>).'
+    : 'Your question sets are saved to your Google account and appear on any computer where you sign in.';
+}
+
+async function initTeacherAccount() {
+  const box = $('#tAcct');
+  try {
+    const user = await accounts.user();
+    if (!user) {
+      box.innerHTML = `<div class="grow"><b>Teacher sign-in</b><br><span class="muted">Sign in to save your question sets to your account, track classes and turn on coins.</span></div>
+        <span class="sync-pill local" id="syncPill"></span><button class="btn primary" id="tAcctIn">Sign in with Google</button>`;
+      $('#tAcctIn').onclick = () => accounts.signIn().catch(e => alert(e.message));
+      setSync('local');
+      return;
+    }
+    if (!(await accounts.isTeacher())) {
+      box.innerHTML = `<div class="grow">Signed in as <b>${esc(user.email)}</b>, which isn’t a teacher account. Ask a WiseRealm teacher to add you on <b>Classes &amp; progress → Teachers</b>.</div>
+        <span class="sync-pill local" id="syncPill"></span><button class="btn small" id="tAcctOut">Sign out</button>`;
+      $('#tAcctOut').onclick = async () => { await accounts.signOut(); location.reload(); };
+      setSync('local');
+      return;
+    }
+    box.innerHTML = `<div class="grow">Signed in as <b>${esc(user.email)}</b> (teacher)${accounts.mode === 'demo' ? ' <span class="muted">· Preview mode</span>' : ''}</div>
+      <span class="sync-pill saving" id="syncPill">☁ Syncing…</span><button class="btn small" id="tAcctOut">Sign out</button>`;
+    $('#tAcctOut').onclick = async () => { await accounts.signOut(); location.reload(); };
+    await startCloudSync(user, state => setSync(state));
+    renderLib();
+  } catch (e) {
+    console.warn(e);
+    box.innerHTML = `<div class="grow muted">${esc(e.message)}</div><span class="sync-pill offline" id="syncPill"></span>`;
+    setSync('offline');
+  }
+}
+
+// ---------------- Teachers (colleagues) ----------------
+async function renderTeachers() {
+  try {
+    const list = await accounts.listTeachers();
+    $('#teacherList').innerHTML = `<table class="data-table"><thead><tr><th>Email</th><th>Status</th><th></th></tr></thead><tbody>
+      ${list.map(t => `<tr><td>${esc(t.email)}</td><td class="muted">${t.signed_up ? 'Has signed in' : 'Not signed in yet'}</td>
+        <td><button class="btn small danger" data-rm-teacher="${esc(t.email)}">Remove</button></td></tr>`).join('')}</tbody></table>`;
+  } catch (e) { $('#teacherList').textContent = e.message; }
+}
+$('#addTeacher').onclick = async () => {
+  const email = $('#newTeacher').value.trim(); if (!email) return;
+  const msg = $('#teacherMsg');
+  try { await accounts.addTeacher(email); $('#newTeacher').value = ''; msg.style.color = 'var(--good)'; msg.textContent = `Added ${email}. They can now sign in at the teacher page.`; renderTeachers(); }
+  catch (e) { msg.style.color = 'var(--bad)'; msg.textContent = e.message; }
+};
+$('#teacherList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-rm-teacher]'); if (!b) return;
+  if (!confirm(`Remove ${b.dataset.rmTeacher} as a teacher? Their classes and sets stay saved but they can’t open them until added again.`)) return;
+  try { await accounts.removeTeacher(b.dataset.rmTeacher); renderTeachers(); } catch (err) { alert(err.message); }
+});
+$('#teachersBox').addEventListener('toggle', () => { if ($('#teachersBox').open) renderTeachers(); });
+
 renderBanner();
 renderLib();
+initTeacherAccount();
 if (location.hash === '#students' || location.hash === '#classes') openStudents();

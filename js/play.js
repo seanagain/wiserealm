@@ -4,6 +4,7 @@
 import { $, esc, show, uid, load, save, fmt, CHOICE_STYLE } from './common.js';
 import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
+import { usableEmotes } from './emotes.js';
 import { avatarSVG, normalizeAvatar, restrictAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES, STYLES } from './avatar.js';
 
 // One ID per device so a student who reloads keeps their score.
@@ -206,7 +207,35 @@ function startTimer(barSel, screenSel) {
   loop();
 }
 
+// ---------------- Emotes (between questions only) ----------------
+const EMOTE_PHASES = ['lobby', 'intro', 'reveal', 'dug', 'end'];
+let emoteCool = 0;
+function renderEmoteBar(s) {
+  const bar = $('#emoteBar');
+  const allowed = joined && s && s.emotes !== false && EMOTE_PHASES.includes(s.phase);
+  if (!allowed) { bar.hidden = true; return; }
+  const list = usableEmotes(account ? account.prof.owned : []);
+  const sig = list.map(e => e.id).join(',');
+  if (bar.dataset.sig !== sig) {
+    bar.dataset.sig = sig;
+    bar.innerHTML = list.map(e => `<button data-e="${e.id}" title="${esc(e.name)}">${esc(e.text)}</button>`).join('') +
+      (account ? '<a class="hint" href="shop.html">More in the shop</a>' : '<span class="hint">Sign in to unlock more emotes</span>');
+  }
+  bar.hidden = false;
+}
+$('#emoteBar').addEventListener('click', e => {
+  const b = e.target.closest('[data-e]'); if (!b || !last) return;
+  const now = performance.now();
+  if (now < emoteCool) return;
+  emoteCool = now + 3000;
+  toHost({ t: 'emote', id: pid, e: b.dataset.e });
+  const btns = document.querySelectorAll('#emoteBar button');
+  btns.forEach(x => (x.disabled = true));
+  setTimeout(() => btns.forEach(x => (x.disabled = false)), 3000);
+});
+
 function render(s) {
+  renderEmoteBar(s);
   const key = s.phase + ':' + s.qi;
   document.querySelectorAll('.score-label').forEach(el => (el.textContent = s.scoreName || 'Score'));
   if (s.phase === 'lobby' || s.phase === 'intro') {

@@ -16,15 +16,25 @@ export function getSets() {
 
 export function getSet(id) { return getSets().find(s => s.id === id) || null; }
 
+// Listeners are told about every change (used to save sets to the teacher's account).
+const listeners = [];
+export function onSetsChanged(fn) { listeners.push(fn); }
+const notify = (id, deleted) => listeners.forEach(fn => { try { fn({ id, deleted }); } catch (e) { console.warn(e); } });
+export const isSample = id => String(id).startsWith('sample-');
+
 export function upsertSet(set) {
   const sets = getSets();
   set.updated = Date.now();
   const i = sets.findIndex(s => s.id === set.id);
   if (i >= 0) sets[i] = set; else sets.unshift(set);
   save(KEY, sets);
+  notify(set.id, false);
 }
 
-export function deleteSet(id) { save(KEY, getSets().filter(s => s.id !== id)); }
+export function deleteSet(id) { save(KEY, getSets().filter(s => s.id !== id)); notify(id, true); }
+
+// Replace this computer's copy of the sets (used after downloading from the account).
+export function replaceAllSets(sets) { save(KEY, sets); }
 
 export function newSet(title = 'Untitled set') {
   return { id: uid(8), title, items: [], updated: Date.now() };
