@@ -52,6 +52,10 @@
       <p class="muted" style="margin:-6px 0 0;font-size:.82rem">Flipped: show the definition, pick the word.</p>
       <label>Auto-advance <input type="checkbox" id="setAuto"></label>
       <label title="Students can send emotes between questions">Student emotes <input type="checkbox" id="setEmotes"></label>
+      <label title="How many coins signed-in students earn this game">Coin rewards <select id="setCoins">
+        <option value="0">None</option><option value="0.5">Low</option><option value="1">Normal</option><option value="2">High</option><option value="3">Huge</option>
+      </select></label>
+      <p class="muted" id="coinHint" style="margin:-6px 0 0;font-size:.82rem"></p>
       <div id="modeSettings"></div>
       <hr>
       <div id="coinBox" class="coin-box muted">Checking coins…</div>

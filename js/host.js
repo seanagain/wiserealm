@@ -17,7 +17,7 @@ export const MODES = { raid, corners, treasure, maze };
 const params = new URLSearchParams(location.search);
 const set = getSet(params.get('set'));
 const mode = MODES[params.get('game')] || raid;
-const S = Object.assign({ time: 20, count: 0, auto: false, flip: false, emotes: true }, load('cq_host_settings', {}));
+const S = Object.assign({ time: 20, count: 0, auto: false, flip: false, emotes: true, coinMult: 1 }, load('cq_host_settings', {}));
 const code = String(10000 + Math.floor(Math.random() * 90000));
 const joinBase = new URL('./', location.href).href;
 
@@ -258,6 +258,9 @@ function setupLobby() {
     save('cq_host_settings', S);
   };
   ['#setTime', '#setCount', '#setFlip', '#setAuto'].forEach(s => $(s).addEventListener('change', persist));
+  $('#setCoins').value = String(S.coinMult ?? 1);
+  $('#coinHint').textContent = coinHint();
+  $('#setCoins').addEventListener('change', () => { S.coinMult = Number($('#setCoins').value); save('cq_host_settings', S); $('#coinHint').textContent = coinHint(); });
   $('#setEmotes').addEventListener('change', () => { S.emotes = $('#setEmotes').checked; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); });
   $('#emoteToggle').onclick = () => { S.emotes = S.emotes === false; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); };
   refreshEmoteToggle();
@@ -474,14 +477,23 @@ function next() {
 
 // Coins: 20 for playing, 10 per correct answer, a bonus for the top 3,
 // and 25 if the class won (Boss Raid). Capped at 300 per game by the database too.
+// The teacher's "Coin rewards" setting multiplies this (None ×0, Low ×½, Normal ×1, High ×2, Huge ×3).
 function computeCoins(list, win) {
-  const awards = {};
+  const awards = {}, mult = Number(S.coinMult ?? 1);
+  if (!mult) return awards;
   list.forEach((p, i) => {
     if (p.bot || !p.uid) return;
-    const amt = 20 + p.correct * 10 + ([30, 20, 10][i] || 0) + (win ? 25 : 0);
-    awards[p.id] = Math.min(300, amt);
+    const amt = Math.round((20 + p.correct * 10 + ([30, 20, 10][i] || 0) + (win ? 25 : 0)) * mult);
+    awards[p.id] = Math.max(1, Math.min(300, amt));
   });
   return awards;
+}
+// Rough range shown under the setting (10 questions, half to all right).
+function coinHint() {
+  const mult = Number(S.coinMult ?? 1);
+  if (!mult) return 'Students won’t earn coins this game (progress is still saved).';
+  const lo = Math.round((20 + 5 * 10) * mult), hi = Math.min(300, Math.round((20 + 10 * 10 + 30) * mult));
+  return `About ${lo}–${hi} coins per student for a 10-question game.`;
 }
 
 async function endGame() {
@@ -514,6 +526,7 @@ async function endGame() {
   const n = Object.keys(byPlayer).length;
   if (!G.teacher) { status.textContent = 'Coins and progress are off for this game (teacher not signed in).'; return; }
   saveResults(list, byPlayer);
+  if (!Number(S.coinMult ?? 1)) { status.textContent = 'Coin rewards were set to None for this game. Progress was saved.'; return; }
   if (!n) { status.textContent = 'No signed-in students this round, so no coins were awarded.'; return; }
   status.textContent = 'Awarding coins…';
   try {
