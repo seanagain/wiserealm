@@ -69,6 +69,20 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
   emotes a student really owns. Turn them off any time with **Student emotes** in the lobby or the
   **😀 Emotes on/off** button during a game.
 
+## Practice at home (single-player study games)
+
+- Open a class → **Practice at home** → tick the question sets students can practice
+  (sets must be saved to your account; duplicate a sample set to use it).
+- Students go to **wiserealm.org/practice.html** (or **Practice** on their profile) and pick a set and a game:
+  - **Training Grounds:** flashcards with ★★★ mastery; missed cards come back.
+  - **Asteroid Blaster:** answers fall as asteroids; blast the right one.
+  - **Memory Match:** flip cards to match words/questions with answers.
+  - **Dungeon Crawl:** explore 3 floors; monsters are questions; final boss: Mr. C.
+- Weakest cards come up first. The database grades every answer, tracks each student's mastery per
+  card, keeps a daily practice streak, and pays at most **50 practice coins per day** (nothing for
+  impossibly fast answering).
+- The **Practice at home** tab shows each student's sessions, minutes, mastery and streak.
+
 ## Try it right now (Local Test Mode / Preview)
 
 Without Supabase settings, games only connect tabs in the same browser, and accounts run in
@@ -228,6 +242,8 @@ js/shop.js             the shop
 js/me.js               student profile page
 js/classes.js          teacher classes & progress dashboard
 js/charts.js           small progress charts
+js/practice.js         practice hub (practice.html)
+js/solo/*.js           the four single-player study games
 js/items.js            shop items (pixel art + prices)
 js/avatar.js           hero art     js/boss.js  boss art     js/sound.js  chiptune sounds
 js/sets.js             question sets     js/teacher.js  teacher page

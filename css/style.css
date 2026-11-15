@@ -493,3 +493,71 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 .stage-maze .mz-wrap { flex: 1; height: auto; }
 .mz-board-wrap { position: relative; height: 100%; }
 .arena.no-q { grid-template-rows: 1fr auto; }
+
+/* ===================== Practice (solo games) ===================== */
+.practice { flex-direction: column; max-width: 1100px; margin: 0 auto; padding: 18px 16px 60px; gap: 18px; }
+.pr-panel { padding: 18px; }
+.game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
+.game-card { padding: 18px; display: flex; flex-direction: column; gap: 8px; text-align: center; align-items: center; }
+.game-card .gicon { font-size: 2.6rem; }
+.game-card h3 { margin: 0; font-size: .8rem; }
+.game-card p { margin: 0; font-size: .95rem; flex: 1; }
+#game { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.sg-top { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 600; font-size: 1.1rem; flex-wrap: wrap; }
+.sg-card { width: 100%; padding: 22px; text-align: center; }
+.sg-stars { font-family: var(--pixel); font-size: .8rem; color: var(--gold); margin-bottom: 10px; }
+.sg-prompt { font-size: clamp(1.3rem, 3.4vw, 2rem); font-weight: 600; line-height: 1.3; }
+.sg-q { width: 100%; padding: 14px 18px; font-size: clamp(1.1rem, 2.8vw, 1.6rem); font-weight: 600; text-align: center; }
+.sg-choices { width: 100%; flex: none; }
+.sg-choices .choice { min-height: 80px; font-size: clamp(1rem, 2.6vw, 1.35rem); padding: 14px; }
+.sg-feedback { min-height: 2em; font-size: 1.15rem; text-align: center; }
+
+/* Asteroid Blaster */
+.blaster { position: relative; width: 100%; height: min(62vh, 560px); overflow: hidden; border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame);
+  background: radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 60%, #fff, transparent), radial-gradient(1px 1px at 40% 80%, #fff, transparent), #0b0820;
+  background-size: 120px 120px, 160px 160px, 90px 90px, auto; touch-action: manipulation; }
+.blaster.shake { animation: sad .4s steps(4); }
+.rock { position: absolute; top: -12%; transform: translateX(-50%); min-height: 64px; padding: 10px 8px; background: #6b4a2b; color: #fff; border: 4px solid #2a1a0e;
+  box-shadow: inset -6px -6px 0 rgba(0,0,0,.3), inset 6px 6px 0 rgba(255,255,255,.15); font-weight: 700; font-size: clamp(.8rem, 1.8vw, 1.05rem); line-height: 1.2; border-radius: 0; text-shadow: 2px 2px 0 #000; }
+.rock.boom { background: var(--good); border-color: #0b5a3a; animation: pop .35s steps(3) reverse; }
+.rock.bad { background: var(--bad); animation: pop .35s steps(3) reverse; }
+.ship { position: absolute; left: 50%; bottom: 8px; width: 72px; transform: translateX(-50%); }
+.ship svg { width: 100%; display: block; }
+.laser { position: absolute; width: 4px; background: #7bf7ff; box-shadow: 0 0 8px #7bf7ff; transform-origin: bottom center; margin-left: -2px; translate: 0 -100%; }
+
+/* Memory Match */
+.mm-grid { width: 100%; display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 12px; }
+.mm-card { min-height: 110px; padding: 10px; border: 4px solid var(--ink); border-radius: 0; background: #3b3575; color: var(--text); font-weight: 600; font-size: clamp(.85rem, 2vw, 1.1rem);
+  box-shadow: var(--bevel), 0 4px 0 var(--ink); display: grid; place-items: center; }
+.mm-card .front { display: none; }
+.mm-card .back { font-family: var(--pixel); font-size: 1.6rem; color: var(--gold); }
+.mm-card.up, .mm-card.done { background: #f4f1e8; color: var(--ink); }
+.mm-card.a.up, .mm-card.a.done { background: #e3f8ff; }
+.mm-card.up .front, .mm-card.done .front { display: block; }
+.mm-card.up .back, .mm-card.done .back { display: none; }
+.mm-card.done { box-shadow: 0 0 0 4px var(--good); opacity: .75; }
+.mm-card.nope { box-shadow: 0 0 0 4px var(--bad); animation: sad .5s steps(4); }
+
+/* Dungeon Crawl */
+.dg-hp { color: #ff5d73; font-size: 1.4rem; letter-spacing: 2px; }
+.dg-msg { width: 100%; padding: 10px 14px; min-height: 48px; }
+.dg-wrap { width: 100%; display: grid; place-items: center; }
+.dg-map { width: min(100%, 860px, calc((100vh - 450px) * var(--w) / var(--h))); display: grid; grid-template-columns: repeat(var(--w), minmax(0, 1fr)); grid-template-rows: repeat(var(--h), minmax(0, 1fr)); border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); background: #000; }
+.dg-t { min-width: 0; min-height: 0; position: relative; display: grid; place-items: center; }
+.dg-t > * { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); }
+.dg-t.w { background: #3b3652; box-shadow: inset 0 3px 0 #57516e; }
+.dg-t.f { background: #1c1829; }
+.dg-t.fog { background: #07050f; box-shadow: none; }
+.dg-t.fog > * { display: none; }
+.dg-hero { width: 130%; } .dg-hero svg, .dg-mon svg { width: 100%; height: auto; display: block; }
+.dg-mon { width: 110%; animation: bob 1s steps(2) infinite; } .dg-mon.boss { width: 160%; z-index: 2; }
+.dg-ico { font-size: clamp(12px, 2.4vw, 26px); }
+.dg-pad { display: grid; grid-template-columns: repeat(3, 84px); grid-template-rows: repeat(2, 70px); gap: 8px; touch-action: none; user-select: none; }
+.dg-pad button { font-size: 1.8rem; background: #3b3575; color: var(--text); border: 4px solid var(--ink); border-radius: 0; box-shadow: var(--bevel), 0 4px 0 var(--ink); }
+.dg-pad [data-d="u"] { grid-column: 2; grid-row: 1; } .dg-pad [data-d="l"] { grid-column: 1; grid-row: 2; }
+.dg-pad [data-d="d"] { grid-column: 2; grid-row: 2; } .dg-pad [data-d="r"] { grid-column: 3; grid-row: 2; }
+.dg-battle { position: fixed; inset: 0; background: rgba(8, 6, 20, .85); display: grid; place-items: center; z-index: 40; padding: 16px; }
+.dg-bcard { width: min(820px, 100%); padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+.dg-foe { width: 160px; } .dg-foe svg { width: 100%; height: auto; }
+.dg-foe.hit { animation: bossHit .3s steps(3); }
+.dg-foe-name { font-family: var(--pixel); font-size: .8rem; color: var(--bad); }

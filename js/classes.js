@@ -1,7 +1,7 @@
 // Teacher dashboard: classes, each student's progress, game history, and what to reteach.
 import { $, $$, esc, fmt, show } from './common.js';
 import { accounts } from './supa.js';
-import { newSet, upsertSet } from './sets.js';
+import { newSet, upsertSet, getSets, isSample } from './sets.js';
 import { barChart, sparkline, pctBar, enableTips } from './charts.js';
 
 const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt' };
@@ -57,10 +57,11 @@ async function openClass(id) {
 
 async function renderClass() {
   const c = current;
-  const [overview, sessions, hard] = await Promise.all([
+  const [overview, sessions, hard, practice, assigned] = await Promise.all([
     accounts.classOverview(c.id), accounts.classSessions(c.id), accounts.hardQuestions(c.id),
+    accounts.classPractice(c.id).catch(() => []), accounts.classAssignedSets(c.id).catch(() => []),
   ]);
-  cache = { overview, sessions, hard };
+  cache = { overview, sessions, hard, practice, assigned };
   const totalC = overview.reduce((s, r) => s + r.correct, 0), totalQ = overview.reduce((s, r) => s + r.total, 0);
   const active = overview.filter(r => r.games > 0).length;
   const review = hard.filter(q => q.pct !== null && q.pct < 60).length;
@@ -85,6 +86,7 @@ async function renderClass() {
       <button class="btn ${tab === 'students' ? 'primary' : ''}" data-tab="students">Students</button>
       <button class="btn ${tab === 'games' ? 'primary' : ''}" data-tab="games">Game history</button>
       <button class="btn ${tab === 'review' ? 'primary' : ''}" data-tab="review">What to reteach</button>
+      <button class="btn ${tab === 'practice' ? 'primary' : ''}" data-tab="practice">Practice at home</button>
     </div>
     <div class="card" style="padding:18px" id="cvPanel"></div>`;
   renderTab();
@@ -117,6 +119,28 @@ function renderTab() {
       </tbody></table></div>
       <p class="muted" style="font-size:.85rem">Click a student’s name to see their progress chart and the questions they miss most.</p>`
       : `<p>No students in this class yet. Show the join code <span class="code-pill">${esc(current.join_code)}</span>, or pick this class in a game lobby and everyone who plays signed in is added.</p>`;
+  } else if (tab === 'practice') {
+    const { practice, assigned } = cache;
+    const mine = getSets().filter(x => !isSample(x.id));
+    const on = new Set(assigned.map(a => a.set_id));
+    panel.innerHTML = `<h3 style="margin-top:0">Sets this class can practice</h3>
+      <p class="muted" style="margin-top:0">Students find these on their <b>Practice</b> page (wiserealm.org/practice.html) with 4 study games:
+        Training Grounds, Asteroid Blaster, Memory Match and Dungeon Crawl. Practice earns up to 50 coins a day.</p>
+      ${mine.length ? `<div class="flex" style="flex-direction:column;align-items:flex-start;gap:6px">${mine.map(x =>
+        `<label class="flex"><input type="checkbox" class="asg" data-set="${esc(x.id)}" ${on.has(x.id) ? 'checked' : ''}> <b>${esc(x.title)}</b> <span class="muted">(${x.items.length} questions)</span></label>`).join('')}</div>`
+        : '<p>You don’t have your own question sets yet. Create one, or <b>Duplicate</b> a sample set, on the main teacher page.</p>'}
+      <div id="asgMsg" class="muted" style="min-height:1.2em;margin-top:6px"></div>
+      <h3>Who’s practicing</h3>
+      ${practice.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Sessions</th><th>Minutes</th><th>Mastered (★★★)</th><th>Streak</th><th>Last practiced</th></tr></thead><tbody>
+        ${practice.map(r => `<tr><td><b>${esc(r.display_name)}</b></td><td>${r.sessions}</td><td>${r.minutes}</td>
+          <td>${r.total_cards ? pctBar((100 * r.mastered) / r.total_cards) + ` <span class="muted">${r.mastered}/${r.total_cards}</span>` : '<span class="muted">no sets assigned</span>'}</td>
+          <td>${r.streak ? '🔥 ' + r.streak : '-'}</td><td>${day(r.last_practiced)}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="muted">No students in this class yet.</p>'}`;
+    panel.querySelectorAll('.asg').forEach(cb => (cb.onchange = async () => {
+      const msg = $('#asgMsg');
+      try { await accounts.assignSet(current.id, cb.dataset.set, cb.checked); msg.textContent = cb.checked ? 'Assigned! Students can practice it now.' : 'Removed from practice.'; cache.assigned = await accounts.classAssignedSets(current.id); }
+      catch (e) { cb.checked = !cb.checked; msg.textContent = e.message; }
+    }));
   } else if (tab === 'games') {
     panel.innerHTML = sessions.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>When</th><th>Game</th><th>Question set</th><th>Players</th><th>Accuracy</th><th></th></tr></thead><tbody>
       ${sessions.map(s => `<tr class="clickable" data-session="${s.id}"><td>${when(s.played_at)}</td><td>${esc(MODE_NAMES[s.mode] || s.mode)}</td><td>${esc(s.set_title || '')}</td>

@@ -138,6 +138,22 @@ export function buildQuestions(set, { count = 0, shuffleOrder = true, flip = fal
   return count > 0 ? out.slice(0, count) : out;
 }
 
+// One multiple-choice question for item i (used by the solo practice games).
+export function questionFor(items, i) {
+  const it = items[i];
+  const lc = x => String(x).toLowerCase();
+  let wrong = shuffle([...new Set(it.wrong || [])].filter(w => lc(w) !== lc(it.answer))).slice(0, 3);
+  if (!wrong.length && /^(true|false)$/i.test(it.answer)) {
+    return { prompt: it.prompt, choices: ['True', 'False'], correct: /^true$/i.test(it.answer) ? 0 : 1 };
+  }
+  if (wrong.length < 3) {
+    const others = shuffle([...new Set(items.map(x => x.answer))].filter(a => lc(a) !== lc(it.answer) && !wrong.some(w => lc(w) === lc(a))));
+    wrong = wrong.concat(others.slice(0, 3 - wrong.length));
+  }
+  const choices = shuffle([it.answer, ...wrong]);
+  return { prompt: it.prompt, choices, correct: choices.indexOf(it.answer) };
+}
+
 function sampleSets() {
   return [
     {

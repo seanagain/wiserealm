@@ -9,6 +9,7 @@ import { ITEM_BY_ID, ITEMS } from './items.js';
 import { PREMIUM_SLOTS } from './avatar.js';
 
 export const isOnline = () => !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
 const CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm';
 
 let clientP = null;
@@ -31,6 +32,8 @@ function friendly(err) {
   if (/not a teacher/i.test(m)) return 'Only teachers can do that.';
   if (/no class with that code/i.test(m)) return 'No class found with that code. Check it with your teacher.';
   if (/yourself/i.test(m)) return 'You can’t remove yourself.';
+  if (/assigned to your class/i.test(m)) return 'That set isn’t assigned to your class anymore.';
+  if (/saved to your account/i.test(m)) return 'Sign in on the teacher page first so this set is saved to your account.';
   if (/look like an email/i.test(m)) return 'That doesn’t look like an email address.';
   return m || 'Something went wrong. Try again.';
 }
@@ -94,6 +97,15 @@ const online = {
   addTeacher(email) { return this.rpc('add_teacher', { p_email: email }); },
   removeTeacher(email) { return this.rpc('remove_teacher', { p_email: email }); },
   playersOwned(uids) { return uids.length ? this.rpc('players_owned', { p_users: uids }) : Promise.resolve([]); },
+  // solo practice
+  assignSet(cls, set, on) { return this.rpc('assign_set', { p_class: cls, p_set: set, p_on: on }); },
+  classAssignedSets(cls) { return this.rpc('class_assigned_sets', { p_class: cls }); },
+  classPractice(cls) { return this.rpc('class_practice', { p_class: cls, p_tz: TZ }); },
+  myPractice() { return this.rpc('my_practice', { p_tz: TZ }); },
+  myCards(set) { return this.rpc('my_cards', { p_set: set }); },
+  savePractice(set, game, answers, score, duration) {
+    return this.rpc('save_practice', { p_set: set, p_game: game, p_answers: answers, p_score: score, p_duration: duration, p_tz: TZ });
+  },
 };
 
 // ---------------- Preview (this device only) ----------------
@@ -147,7 +159,70 @@ const demo = {
     save('wr_demo_teachers', (await this.listTeachers()).filter(t => t.email !== email)); return true;
   },
   async playersOwned(uids) { const p = demoProfile(); return uids.includes(p.id) ? [{ id: p.id, owned: p.owned }] : []; },
+  ...demoPractice(),
 };
+
+// Preview-mode practice, mirroring save_practice etc. in supabase/schema.sql.
+function demoPractice() {
+  const DB = 'wr_demo_db';
+  const db = () => Object.assign({ classes: [], members: [], class_sets: [], cards: [], psessions: [] }, load(DB, {}));
+  const put = d => save(DB, d);
+  const cloudSet = id => load('wr_demo_cloud_sets', []).find(s => s.id === id);
+  const key = p => String(p || '').trim().toLowerCase();
+  const day = t => new Date(t).toLocaleDateString('en-CA');
+  const streak = d => { const days = new Set(d.psessions.map(s => day(s.played_at))); let t = new Date(); if (!days.has(day(t))) t.setDate(t.getDate() - 1); let n = 0; while (days.has(day(t))) { n++; t.setDate(t.getDate() - 1); } return n; };
+  const todayCoins = d => d.psessions.filter(s => day(s.played_at) === day(Date.now())).reduce((a, s) => a + s.coins, 0);
+  return {
+    async assignSet(cls, set, on) {
+      const d = db(); if (!cloudSet(set)) throw new Error('That set isn’t saved to your account yet');
+      d.class_sets = d.class_sets.filter(x => !(x.class_id === cls && x.set_id === set));
+      if (on) d.class_sets.push({ class_id: cls, set_id: set, assigned_at: new Date().toISOString() });
+      put(d); return true;
+    },
+    async classAssignedSets(cls) { const d = db(); return d.class_sets.filter(x => x.class_id === cls).map(x => { const s = cloudSet(x.set_id); return s && { set_id: s.id, title: s.title, cards: s.items.length, assigned_at: x.assigned_at }; }).filter(Boolean); },
+    async classPractice(cls) {
+      const d = db(), p = demoProfile();
+      const sets = d.class_sets.filter(x => x.class_id === cls).map(x => cloudSet(x.set_id)).filter(Boolean);
+      return d.members.filter(m => m.class_id === cls).map(() => {
+        const ss = d.psessions.filter(s => sets.some(x => x.id === s.set_id));
+        return { user_id: p.id, display_name: p.display_name, sessions: ss.length, minutes: Math.floor(ss.reduce((a, s) => a + s.duration_s, 0) / 60),
+          last_practiced: d.psessions.length ? d.psessions[d.psessions.length - 1].played_at : null,
+          mastered: d.cards.filter(c => c.box >= 3 && sets.some(x => x.id === c.set_id)).length, total_cards: sets.reduce((a, x) => a + x.items.length, 0), streak: streak(d) };
+      });
+    },
+    async myPractice() {
+      const d = db(); const out = [];
+      for (const m of d.members.filter(m => m.user_id === 'demo-user')) {
+        const c = d.classes.find(x => x.id === m.class_id); if (!c || c.archived) continue;
+        for (const cs of d.class_sets.filter(x => x.class_id === c.id)) {
+          const s = cloudSet(cs.set_id); if (!s || out.some(o => o.id === s.id)) continue;
+          out.push({ id: s.id, title: s.title, class_name: c.name, items: s.items, cards: s.items.length,
+            mastered: d.cards.filter(k => k.set_id === s.id && k.box >= 3).length, seen: d.cards.filter(k => k.set_id === s.id).length });
+        }
+      }
+      return { sets: out, streak: streak(d), today_coins: todayCoins(d), cap: 50 };
+    },
+    async myCards(set) { return db().cards.filter(c => c.set_id === set); },
+    async savePractice(setId, game, answers, score, duration) {
+      const d = db(), s = cloudSet(setId); if (!s) throw new Error('That set isn’t assigned to your class');
+      let right = 0, n = 0;
+      for (const a of answers.slice(0, 300)) {
+        const item = s.items[a.q]; if (!item) continue;
+        const ok = key(a.a) === key(item.answer); n++; if (ok) right++;
+        const k = key(item.prompt); let c = d.cards.find(x => x.set_id === setId && x.card_key === k);
+        if (!c) { c = { set_id: setId, card_key: k, box: 0, seen: 0, right_count: 0 }; d.cards.push(c); }
+        c.box = ok ? Math.min(3, c.box + 1) : 0; c.seen++; c.right_count += ok ? 1 : 0; c.last_seen = new Date().toISOString();
+      }
+      const today = todayCoins(d), dur = Math.max(1, duration | 0);
+      let earn = Math.min(20, Math.floor(right / 2) + (n >= 10 ? 3 : 0), Math.max(0, 50 - today));
+      if (n > dur * 2) earn = 0;
+      d.psessions.push({ set_id: setId, game, correct: right, answered: n, score, duration_s: dur, coins: earn, played_at: new Date().toISOString() });
+      put(d);
+      if (earn) { const p = demoProfile(); p.coins += earn; save(DEMO_KEY, p); }
+      return { correct: right, answered: n, coins: earn, today_coins: today + earn, cap: 50, streak: streak(d) };
+    },
+  };
+}
 
 // Preview-mode classes & progress, stored on this device. Mirrors supabase/schema.sql.
 function demoClasses() {

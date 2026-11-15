@@ -608,6 +608,180 @@ revoke all on function public.list_sets(), public.save_set(text, text, jsonb), p
 grant execute on function public.list_sets(), public.save_set(text, text, jsonb), public.delete_set(text), public.list_teachers(),
   public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]) to authenticated;
 
+-- ================= Solo practice (study games) =================
+-- Teachers assign question sets to classes; students practice them in single-player games.
+-- The database checks every answer against the set, tracks mastery per card (0-3 stars),
+-- and pays at most 50 practice coins per student per day.
+create table if not exists public.class_sets (
+  class_id uuid not null references public.classes (id) on delete cascade,
+  set_id text not null references public.question_sets (id) on delete cascade,
+  assigned_at timestamptz not null default now(),
+  primary key (class_id, set_id)
+);
+create table if not exists public.practice_cards (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  set_id text not null references public.question_sets (id) on delete cascade,
+  card_key text not null,
+  box integer not null default 0,
+  seen integer not null default 0,
+  right_count integer not null default 0,
+  last_seen timestamptz,
+  primary key (user_id, set_id, card_key)
+);
+create table if not exists public.practice_sessions (
+  id bigserial primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  set_id text references public.question_sets (id) on delete set null,
+  game text,
+  correct integer not null default 0,
+  answered integer not null default 0,
+  score integer not null default 0,
+  duration_s integer not null default 0,
+  coins integer not null default 0,
+  played_at timestamptz not null default now()
+);
+create index if not exists practice_sessions_user on public.practice_sessions (user_id, played_at);
+alter table public.class_sets enable row level security;
+alter table public.practice_cards enable row level security;
+alter table public.practice_sessions enable row level security;
+
+create or replace function public.card_key(prompt text) returns text
+language sql immutable as $$ select left(lower(trim(coalesce(prompt, ''))), 500) $$;
+
+create or replace function public.safe_tz(p_tz text) returns text
+language plpgsql stable as $$
+begin
+  perform now() at time zone p_tz;
+  return p_tz;
+exception when others then return 'UTC';
+end $$;
+
+create or replace function public.can_practice(p_set text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.class_sets cs join public.class_members m on m.class_id = cs.class_id
+                 join public.classes c on c.id = cs.class_id
+                 where cs.set_id = p_set and m.user_id = auth.uid() and not c.archived)
+      or exists (select 1 from public.question_sets q where q.id = p_set and q.teacher_id = auth.uid());
+$$;
+
+create or replace function public.practice_streak(p_user uuid, p_tz text) returns integer
+language plpgsql stable security definer set search_path = public as $$
+declare tz text := public.safe_tz(p_tz); d date := (now() at time zone tz)::date; n int := 0;
+begin
+  if not exists (select 1 from public.practice_sessions where user_id = p_user and (played_at at time zone tz)::date = d) then d := d - 1; end if;
+  while exists (select 1 from public.practice_sessions where user_id = p_user and (played_at at time zone tz)::date = d) loop
+    n := n + 1; d := d - 1;
+  end loop;
+  return n;
+end $$;
+
+-- ---------- Teacher: assign sets ----------
+create or replace function public.assign_set(p_class uuid, p_set text, p_on boolean) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.owns_class(p_class) then raise exception 'Not your class'; end if;
+  if not exists (select 1 from public.question_sets where id = p_set and teacher_id = auth.uid()) then
+    raise exception 'That set isn''t saved to your account yet';
+  end if;
+  if p_on then insert into public.class_sets (class_id, set_id) values (p_class, p_set) on conflict do nothing;
+  else delete from public.class_sets where class_id = p_class and set_id = p_set; end if;
+  return true;
+end $$;
+
+create or replace function public.class_assigned_sets(p_class uuid) returns table (set_id text, title text, cards integer, assigned_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.owns_class(p_class) then raise exception 'Not your class'; end if;
+  return query select q.id, q.title, jsonb_array_length(q.items), cs.assigned_at
+    from public.class_sets cs join public.question_sets q on q.id = cs.set_id where cs.class_id = p_class order by cs.assigned_at;
+end $$;
+
+create or replace function public.class_practice(p_class uuid, p_tz text)
+returns table (user_id uuid, display_name text, sessions integer, minutes integer, last_practiced timestamptz,
+               mastered integer, total_cards integer, streak integer)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.owns_class(p_class) then raise exception 'Not your class'; end if;
+  return query
+    select p.id, p.display_name,
+      (select count(*)::int from public.practice_sessions s where s.user_id = p.id and s.set_id in (select cs.set_id from public.class_sets cs where cs.class_id = p_class)),
+      (select coalesce(sum(s.duration_s), 0)::int / 60 from public.practice_sessions s where s.user_id = p.id and s.set_id in (select cs.set_id from public.class_sets cs where cs.class_id = p_class)),
+      (select max(s.played_at) from public.practice_sessions s where s.user_id = p.id),
+      (select count(*)::int from public.practice_cards pc where pc.user_id = p.id and pc.box >= 3 and pc.set_id in (select cs.set_id from public.class_sets cs where cs.class_id = p_class)),
+      (select coalesce(sum(jsonb_array_length(q.items)), 0)::int from public.class_sets cs join public.question_sets q on q.id = cs.set_id where cs.class_id = p_class),
+      public.practice_streak(p.id, p_tz)
+    from public.class_members m join public.profiles p on p.id = m.user_id
+    where m.class_id = p_class order by p.display_name;
+end $$;
+
+-- ---------- Students: practice ----------
+create or replace function public.my_practice(p_tz text) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare me uuid := auth.uid(); tz text := public.safe_tz(p_tz);
+begin
+  if me is null then raise exception 'Not signed in'; end if;
+  return jsonb_build_object(
+    'sets', coalesce((select jsonb_agg(x order by x ->> 'class_name', x ->> 'title') from (
+      select distinct on (q.id) jsonb_build_object('id', q.id, 'title', q.title, 'class_name', c.name, 'items', q.items,
+        'cards', jsonb_array_length(q.items),
+        'mastered', (select count(*) from public.practice_cards pc where pc.user_id = me and pc.set_id = q.id and pc.box >= 3),
+        'seen', (select count(*) from public.practice_cards pc where pc.user_id = me and pc.set_id = q.id)) x
+      from public.class_members m join public.classes c on c.id = m.class_id and not c.archived
+      join public.class_sets cs on cs.class_id = c.id join public.question_sets q on q.id = cs.set_id
+      where m.user_id = me order by q.id) y), '[]'::jsonb),
+    'streak', public.practice_streak(me, tz),
+    'today_coins', (select coalesce(sum(coins), 0) from public.practice_sessions where user_id = me and (played_at at time zone tz)::date = (now() at time zone tz)::date),
+    'cap', 50);
+end $$;
+
+create or replace function public.my_cards(p_set text) returns table (card_key text, box integer, seen integer, right_count integer, last_seen timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.can_practice(p_set) then raise exception 'That set isn''t assigned to your class'; end if;
+  return query select pc.card_key, pc.box, pc.seen, pc.right_count, pc.last_seen from public.practice_cards pc where pc.user_id = auth.uid() and pc.set_id = p_set;
+end $$;
+
+-- p_answers: [{q: question number in the set, a: the answer text the student chose}]
+create or replace function public.save_practice(p_set text, p_game text, p_answers jsonb, p_score integer, p_duration integer, p_tz text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); tz text := public.safe_tz(p_tz); items jsonb; a jsonb; item jsonb; ok boolean;
+  n_right int := 0; n_ans int := 0; today int; earn int; sid bigint; dur int := greatest(1, least(coalesce(p_duration, 0), 7200));
+begin
+  if me is null then raise exception 'Not signed in'; end if;
+  if not public.can_practice(p_set) then raise exception 'That set isn''t assigned to your class'; end if;
+  perform public.my_profile();
+  select q.items into items from public.question_sets q where q.id = p_set;
+  for a in select * from jsonb_array_elements(coalesce(p_answers, '[]'::jsonb)) limit 300 loop
+    begin item := items -> ((a ->> 'q')::int); exception when others then continue; end;
+    if item is null then continue; end if;
+    ok := lower(trim(coalesce(a ->> 'a', ''))) = lower(trim(coalesce(item ->> 'answer', '')));
+    n_ans := n_ans + 1; if ok then n_right := n_right + 1; end if;
+    insert into public.practice_cards as pc (user_id, set_id, card_key, box, seen, right_count, last_seen)
+    values (me, p_set, public.card_key(item ->> 'prompt'), case when ok then 1 else 0 end, 1, case when ok then 1 else 0 end, now())
+    on conflict (user_id, set_id, card_key) do update set
+      box = case when ok then least(3, pc.box + 1) else 0 end, seen = pc.seen + 1,
+      right_count = pc.right_count + case when ok then 1 else 0 end, last_seen = now();
+  end loop;
+  select coalesce(sum(coins), 0) into today from public.practice_sessions
+    where user_id = me and (played_at at time zone tz)::date = (now() at time zone tz)::date;
+  -- 1 coin per 2 right answers (+3 for a full session), at most 20 per game and 50 per day.
+  earn := least(20, n_right / 2 + case when n_ans >= 10 then 3 else 0 end, greatest(0, 50 - today));
+  if n_ans > dur * 2 then earn := 0; end if; -- impossibly fast: no coins
+  insert into public.practice_sessions (user_id, set_id, game, correct, answered, score, duration_s, coins)
+  values (me, p_set, left(p_game, 20), n_right, n_ans, greatest(0, coalesce(p_score, 0)), dur, earn) returning id into sid;
+  if earn > 0 then
+    update public.profiles set coins = coins + earn where id = me;
+    insert into public.coin_log (user_id, amount, reason) values (me, earn, 'Practice: ' || coalesce(p_game, 'game'));
+  end if;
+  return jsonb_build_object('correct', n_right, 'answered', n_ans, 'coins', earn, 'today_coins', today + earn, 'cap', 50,
+    'streak', public.practice_streak(me, tz));
+end $$;
+
+revoke all on function public.assign_set(uuid, text, boolean), public.class_assigned_sets(uuid), public.class_practice(uuid, text),
+  public.my_practice(text), public.my_cards(text), public.save_practice(text, text, jsonb, integer, integer, text) from public, anon;
+grant execute on function public.assign_set(uuid, text, boolean), public.class_assigned_sets(uuid), public.class_practice(uuid, text),
+  public.my_practice(text), public.my_cards(text), public.save_practice(text, text, jsonb, integer, integer, text) to authenticated;
+
 -- ---------- Shop catalog (generated from js/items.js by tools/gen-shop-sql.mjs) ----------
 -- BEGIN SHOP ITEMS
 insert into public.shop_items (id, slot, name, price) values
