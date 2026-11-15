@@ -100,6 +100,58 @@ export const ITEMS = [
     '..KKK..', '.KYYEK.', '.KYYYOO', 'KKYYYK.', 'KyYYYYK', '.KKKKK.'] },
   { id: 'pet_dragon', slot: 'pet', name: 'Baby Dragon', price: 400, abs: true, y: 16, x: 0, pal: { R: '#8e44ad', r: '#5b2c6f', Y: '#ffd23f', E: '#1a1226', W: '#ffffff' }, rows: [
     '.K.....', 'KrK.KK.', 'KRRKRRK', 'KRWERRK', '.KRRRYK', 'KRRRRK.', 'KRKKRK.', '.K..K..'] },
+  // ---------- Wave 2 ----------
+  { id: 'hat_cowboy', slot: 'phat', name: 'Cowboy Hat', price: 110, y: 1, pal: { B: '#8b5a2b', b: '#5c3a1a' }, rows: [
+    '......KKKKKK', '.....KBBBBBBK', '.....KBBBBBBK', '.....KbbbbbbK', '.KBBBBBBBBBBBBBBK'] },
+  { id: 'hat_party', slot: 'phat', name: 'Party Hat', price: 70, y: 0, withHair: true, pal: { P: '#ff4d6d', W: '#ffd23f', Y: '#4cc9f0' }, rows: [
+    '........YY', '.......KPPK', '......KPWWPK', '......KPPPPK', '.....KWWPPWWK'] },
+  { id: 'hat_bunny', slot: 'phat', name: 'Bunny Ears', price: 90, y: 0, withHair: true, pal: { W: '#f4f4f4', P: '#ff8fab' }, rows: [
+    '....KWK..KWK', '....KPK..KPK', '....KPK..KPK', '....KWK..KWK'] },
+  { id: 'hat_cat', slot: 'phat', name: 'Cat Ears', price: 80, y: 0, withHair: true, pal: { P: '#ff8fab' }, rows: [
+    '....K......K', '....KK....KK', '....KPK..KPK'] },
+  { id: 'hat_astro', slot: 'phat', name: 'Astronaut Helmet', price: 350, y: 1, pal: { g: 'rgba(200,230,255,.45)', W: '#ffffff', M: '#c3ccd6' }, rows: [
+    '.....KKKKKKKK', '...KKggggggggKK', '..KgWggggggggggK', '..Kg..........gK', '..Kg..........gK', '..Kg..........gK',
+    '..Kg..........gK', '..Kg..........gK', '..Kg..........gK', '...Kgg......ggK', '....KMMMMMMMMK'] },
+  { id: 'hat_grad', slot: 'phat', name: 'Graduation Cap', price: 150, y: 1, pal: { D: '#22222b', Y: '#ffd23f' }, rows: [
+    '...KKKKKKKKKKKK', '..KDDDDDDDDDDDDK', '....KKDDDDDDKK.Y', '.....KDDDDDDK..Y', '...............Y'] },
+  { id: 'hat_santa', slot: 'phat', name: 'Santa Hat', price: 120, y: 0, pal: { R: '#e63946', W: '#ffffff' }, rows: [
+    '..........KKK', '........KKRRRK', '......KKRRRRRRKWK', '.....KRRRRRRRRK', '...KWWWWWWWWWWK'] },
+  { id: 'hat_mushroom', slot: 'phat', name: 'Mushroom Cap', price: 100, y: 0, pal: { R: '#e63946', W: '#ffffff' }, rows: [
+    '.....KKKKKKKK', '...KKRRWRRRRWKK', '..KRRRRRRWWRRRRK', '..KRWWRRRRRRRWRK', '..KKKKKKKKKKKKKK'] },
+
+  { id: 'top_space', slot: 'top', name: 'Space Suit', price: 200, y: 12, pal: { W: '#f4f4f4', w: '#c9ced6', B: '#4cc9f0', R: '#e63946', Y: '#ffd23f', G: '#8b95a7' }, rows: [
+    '....KWWWWWWWWK', '...KWWWWWWWWWWK', '..KWKWWBRYBWWKWK', '..KSKWWWWWWWWKSK', '..KKKGGGGGGGGKKK', '....KWWWWWWWWK', '....KwwWWWWwwK'] },
+  { id: 'top_super', slot: 'top', name: 'Superhero Suit', price: 180, y: 12, pal: { U: '#1e88e5', u: '#155fa0', R: '#e63946', Y: '#ffd23f' }, rows: [
+    '....KUUUUUUUUK', '...KUUUYYYYUUUK', '..KUKUURRRRUUKUK', '..KSKUUURRUUUKSK', '..KKKYYYYYYYYKKK', '....KUUUUUUUUK', '....KuuUUUUuuK'] },
+  { id: 'top_lab', slot: 'top', name: 'Lab Coat', price: 120, y: 12, pal: { W: '#ffffff', w: '#d9dde3', P: '#4cc9f0' }, rows: [
+    '....KWWWCCWWWK', '...KWWWWCCWWWWK', '..KWKWWWCCWWWKWK', '..KSKWPWCCWWWKSK', '..KKKWWWCCWWWKKK', '....KWWWCCWWWK', '....KWWWwwWWWK'] },
+  { id: 'top_pirate', slot: 'top', name: 'Pirate Coat', price: 150, y: 12, pal: { R: '#a5222e', r: '#7a1620', W: '#f4ecd8', Y: '#ffd23f', D: '#22222b' }, rows: [
+    '....KRRWWWWRRK', '...KRRRWWWWRRRK', '..KRKRRYWWYRRKRK', '..KSKRRRWWRRRKSK', '..KKKDDDYYDDDKKK', '....KRRRRRRRRK', '....KrrRRRRrrK'] },
+  { id: 'top_rainbow', slot: 'top', name: 'Rainbow Sweater', price: 100, y: 12, pal: { R: '#e63946', O: '#f4845f', Y: '#ffd23f', G: '#3ddc84', B: '#4cc9f0', P: '#8e44ad' }, rows: [
+    '....KRRRRRRRRK', '...KOOOOOOOOOOK', '..KYKYYYYYYYYKYK', '..KSKGGGGGGGGKSK', '..KKKBBBBBBBBKKK', '....KPPPPPPPPK', '....KRRRRRRRRK'] },
+
+  cape('cape_ember', 'Ember Cape', 170, '#ff7a45', '#c0392b', '#ffd23f'),
+  cape('cape_forest', 'Forest Cape', 140, '#3c9a47', '#256b30', '#8b5a2b'),
+  cape('cape_galaxy', 'Galaxy Cape', 250, '#2b2d6e', '#1a1b45', '#ff8fab'),
+
+  { id: 'acc_clown', slot: 'acc', name: 'Clown Nose', price: 50, y: 8, pal: { R: '#e63946' }, rows: ['........RR'] },
+  { id: 'acc_fangs', slot: 'acc', name: 'Vampire Fangs', price: 80, y: 10, pal: { W: '#ffffff' }, rows: ['.......W..W'] },
+  { id: 'acc_hearts', slot: 'acc', name: 'Heart Eyes', price: 100, y: 6, pal: { P: '#ff4d6d' }, rows: ['.....P.P..P.P', '.....PPP..PPP', '......P....P'] },
+  { id: 'acc_bandage', slot: 'acc', name: 'Bandage', price: 40, y: 9, pal: { B: '#e8b48a', b: '#c98f66' }, rows: ['..........BbB'] },
+  { id: 'acc_freckles', slot: 'acc', name: 'Freckles', price: 30, y: 9, pal: { d: '#a0522d' }, rows: ['....d.d....d.d'] },
+
+  { id: 'pet_penguin', slot: 'pet', name: 'Penguin', price: 220, abs: true, y: 17, x: 0, pal: { W: '#ffffff', O: '#ffa62b' }, rows: [
+    '.KKK.', 'KWKWK', 'KKOKK', 'KWWWK', 'KWWWK', '.KKK.', '.O.O.'] },
+  { id: 'pet_bunny', slot: 'pet', name: 'Bunny', price: 180, abs: true, y: 16, x: 0, pal: { W: '#f4f4f4', P: '#ff8fab', E: '#1a1226' }, rows: [
+    '.K.K.', 'KPKPK', 'KWWWK', 'KEWEK', 'KWPWK', 'KWWWK', '.KKK.'] },
+  { id: 'pet_ghost', slot: 'pet', name: 'Ghost', price: 260, abs: true, y: 16, x: 0, pal: { W: '#e8f0ff', E: '#1a1226', O: '#1a1226' }, rows: [
+    '.KKK.', 'KWWWK', 'KEWEK', 'KWWWK', 'KWOWK', 'KWWWK', 'KWKWK', 'K.K.K'] },
+  { id: 'pet_robot', slot: 'pet', name: 'Robot', price: 320, abs: true, y: 15, x: 0, pal: { M: '#8b95a7', C: '#4cc9f0', R: '#e63946', Y: '#ffd23f' }, rows: [
+    '..R..', '..K..', 'KKKKK', 'KCMCK', 'KMMMK', 'KMYMK', 'KKKKK', '.K.K.', '.K.K.'] },
+  { id: 'pet_fox', slot: 'pet', name: 'Fox', price: 240, abs: true, y: 17, x: 0, pal: { O: '#f4845f', W: '#ffffff', E: '#1a1226' }, rows: [
+    'K...K..', 'KOKOK..', 'KEOEK..', 'KWKWK.K', 'KOOOKKO', 'KOOOKOW', '.K.K.K.'] },
+  { id: 'pet_phoenix', slot: 'pet', name: 'Phoenix', price: 500, abs: true, y: 15, x: 0, pal: { R: '#ff5a1f', Y: '#ffd23f', E: '#1a1226', O: '#fff3b0' }, rows: [
+    '..Y..', '.YRY.', 'YRERY', 'RRRRO', 'YRRRRY', 'YYRRYY', '.YRRY.', '..YY..'] },
 ];
 
 // ---------- Emotes: reactions students can send between questions ----------
@@ -119,6 +171,12 @@ ITEMS.push(
   emote('emote_thanks', 'Thank You', 90, 'THANK YOU! ❤', 'hearts'),
   emote('emote_hype', 'Hype', 250, 'HYPE!!', 'confetti'),
   emote('emote_dance', 'Victory Dance', 300, '♪ ♫ ♪', 'dance'),
+  emote('emote_mindblown', 'Mind Blown', 150, 'MIND BLOWN 🤯', 'shake'),
+  emote('emote_clutch', 'Clutch!', 120, 'CLUTCH!', 'glow'),
+  emote('emote_freeze', 'Brain Freeze', 90, 'brain freeze 🥶', 'deadpan'),
+  emote('emote_respect', 'Respect', 100, 'RESPECT 🫡', 'pop'),
+  emote('emote_knewit', 'I Knew It!', 80, 'I KNEW IT!', 'pulse'),
+  emote('emote_twist', 'Plot Twist!', 110, 'PLOT TWIST!', 'drop'),
 );
 
 export const ITEM_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
