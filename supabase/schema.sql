@@ -782,6 +782,44 @@ revoke all on function public.assign_set(uuid, text, boolean), public.class_assi
 grant execute on function public.assign_set(uuid, text, boolean), public.class_assigned_sets(uuid), public.class_practice(uuid, text),
   public.my_practice(text), public.my_cards(text), public.save_practice(text, text, jsonb, integer, integer, text) to authenticated;
 
+-- ================= Display names =================
+-- Students can change their own name; teachers can rename students in their classes.
+create or replace function public.clean_name(p_name text) returns text
+language plpgsql immutable as $$
+declare n text := regexp_replace(trim(coalesce(p_name, '')), '\s+', ' ', 'g');
+begin
+  if length(n) < 2 or length(n) > 16 then raise exception 'Names must be 2 to 16 characters'; end if;
+  if n !~ '^[[:alnum:] .''-]+$' then raise exception 'Names can only use letters, numbers, spaces, periods, apostrophes and dashes'; end if;
+  return n;
+end $$;
+
+create or replace function public.set_display_name(p_name text) returns public.profiles
+language plpgsql security definer set search_path = public as $$
+declare prof public.profiles;
+begin
+  if auth.uid() is null then raise exception 'Not signed in'; end if;
+  perform public.my_profile();
+  update public.profiles set display_name = public.clean_name(p_name) where id = auth.uid() returning * into prof;
+  return prof;
+end $$;
+
+create or replace function public.rename_student(p_user uuid, p_name text) returns text
+language plpgsql security definer set search_path = public as $$
+declare n text;
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  if not exists (select 1 from public.class_members m join public.classes c on c.id = m.class_id
+                 where m.user_id = p_user and c.teacher_id = auth.uid()) then
+    raise exception 'That student isn''t in one of your classes';
+  end if;
+  n := public.clean_name(p_name);
+  update public.profiles set display_name = n where id = p_user;
+  return n;
+end $$;
+
+revoke all on function public.set_display_name(text), public.rename_student(uuid, text) from public, anon;
+grant execute on function public.set_display_name(text), public.rename_student(uuid, text) to authenticated;
+
 -- ---------- Shop catalog (generated from js/items.js by tools/gen-shop-sql.mjs) ----------
 -- BEGIN SHOP ITEMS
 insert into public.shop_items (id, slot, name, price) values

@@ -97,6 +97,8 @@ const online = {
   addTeacher(email) { return this.rpc('add_teacher', { p_email: email }); },
   removeTeacher(email) { return this.rpc('remove_teacher', { p_email: email }); },
   playersOwned(uids) { return uids.length ? this.rpc('players_owned', { p_users: uids }) : Promise.resolve([]); },
+  setDisplayName(name) { return this.rpc('set_display_name', { p_name: name }); },
+  renameStudent(user, name) { return this.rpc('rename_student', { p_user: user, p_name: name }); },
   // solo practice
   assignSet(cls, set, on) { return this.rpc('assign_set', { p_class: cls, p_set: set, p_on: on }); },
   classAssignedSets(cls) { return this.rpc('class_assigned_sets', { p_class: cls }); },
@@ -160,7 +162,17 @@ const demo = {
   },
   async playersOwned(uids) { const p = demoProfile(); return uids.includes(p.id) ? [{ id: p.id, owned: p.owned }] : []; },
   ...demoPractice(),
+  async setDisplayName(name) { const p = demoProfile(); p.display_name = demoCleanName(name); save(DEMO_KEY, p); return p; },
+  async renameStudent(_u, name) { const p = demoProfile(); p.display_name = demoCleanName(name); save(DEMO_KEY, p); return p.display_name; },
 };
+
+// Same rules as clean_name() in supabase/schema.sql.
+function demoCleanName(name) {
+  const n = String(name || '').trim().replace(/\s+/g, ' ');
+  if (n.length < 2 || n.length > 16) throw new Error('Names must be 2 to 16 characters');
+  if (!/^[\p{L}\p{N} .'-]+$/u.test(n)) throw new Error('Names can only use letters, numbers, spaces, periods, apostrophes and dashes');
+  return n;
+}
 
 // Preview-mode practice, mirroring save_practice etc. in supabase/schema.sql.
 function demoPractice() {

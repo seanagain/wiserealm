@@ -175,7 +175,8 @@ async function openStudent(uid) {
   const avg = l => { const t = l.reduce((s, x) => s + x.total, 0); return t ? Math.round((100 * l.reduce((s, x) => s + x.correct, 0)) / t) : null; };
   const trend = g.length >= 4 ? avg(secondHalf) - avg(firstHalf) : null;
   $('#detailBody').innerHTML = `
-    <h2 style="margin-top:0">${esc(d.profile.name)} <span class="muted" style="font-size:.7rem">${esc(d.profile.email || '')}</span></h2>
+    <div class="flex"><h2 style="margin:0">${esc(d.profile.name)} <span class="muted" style="font-size:.7rem">${esc(d.profile.email || '')}</span></h2>
+      <span class="spacer"></span><button class="btn small" id="renameStudent" data-uid="${esc(uid)}" data-name="${esc(d.profile.name)}">✏️ Rename</button></div>
     <div class="tiles">
       <div class="card tile-stat"><div class="lbl">Games</div><div class="num">${g.length}</div></div>
       <div class="card tile-stat"><div class="lbl">Accuracy</div><div class="num">${totalQ ? Math.round((100 * totalC) / totalQ) + '%' : '-'}</div><div class="sub">${totalC} of ${totalQ} right</div></div>
@@ -253,4 +254,11 @@ $('#classView').addEventListener('click', async e => {
   }
 });
 $('#detailClose').onclick = () => $('#detail').close();
+$('#detailBody').addEventListener('click', async e => {
+  const b = e.target.closest('#renameStudent'); if (!b) return;
+  const name = prompt('New name for this student (2 to 16 characters)', b.dataset.name);
+  if (!name) return;
+  try { await accounts.renameStudent(b.dataset.uid, name); await openStudent(b.dataset.uid); if (current) await renderClass(); }
+  catch (err) { alert(err.message); }
+});
 $('#codeClose').onclick = () => $('#codeDialog').close();

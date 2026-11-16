@@ -40,6 +40,12 @@
     <div class="me-top">
       <div class="card hero-card">
         <h3 style="margin:0" id="name"></h3>
+        <button class="btn small" id="renameBtn">✏️ Change name</button>
+        <div class="flex" id="renameForm" hidden style="justify-content:center">
+          <input class="input" id="renameIn" maxlength="16" style="max-width:190px;font-size:1rem;padding:8px 10px">
+          <button class="btn small primary" id="renameSave">Save</button><button class="btn small" id="renameCancel">Cancel</button>
+        </div>
+        <div id="renameMsg" style="min-height:1.1em;font-size:.9rem"></div>
         <div class="hero-big" id="hero"></div>
         <span class="coin-pill" id="coins"></span>
         <a class="btn small" href="shop.html">Change my hero</a>

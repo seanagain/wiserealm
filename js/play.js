@@ -49,12 +49,15 @@ async function loadAccount() {
     $('#nameNote').hidden = false;
     $('#toAvatar').textContent = 'Join game!';
     box.hidden = false;
-    box.innerHTML = `<div class="mini">${avatarSVG(profile.av)}</div>
-      <div class="grow"><b>${esc(prof.display_name)}</b>${accounts.mode === 'demo' ? ' <small>(preview)</small>' : ''}<br><span class="coin-pill">🪙 ${fmt(prof.coins)}</span></div>
-      <a class="btn small primary" href="shop.html">Shop</a>
-      <a class="btn small" href="practice.html">Practice</a>
-      <a class="btn small" href="me.html">Profile</a>
-      <button class="btn small" id="signOutBtn">Sign out</button>`;
+    box.innerHTML = `<div class="acct-row"><div class="mini">${avatarSVG(profile.av)}</div>
+        <div class="grow"><b>${esc(prof.display_name)}</b>${accounts.mode === 'demo' ? ' <small>(preview)</small>' : ''}</div>
+        <span class="coin-pill">🪙 ${fmt(prof.coins)}</span></div>
+      <div class="acct-actions">
+        <a class="btn small primary" href="shop.html">Shop</a>
+        <a class="btn small" href="practice.html">Practice</a>
+        <a class="btn small" href="me.html">Profile</a>
+        <button class="btn small" id="signOutBtn">Sign out</button>
+      </div>`;
     $('#signOutBtn').onclick = async () => { await accounts.signOut(); location.reload(); };
   } catch (e) {
     console.warn(e);

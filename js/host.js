@@ -142,19 +142,24 @@ function handleJoin(m) {
   if (G.kicked.has(id)) return send({ t: 'joined', to: id, ok: false, reason: 'kicked' });
   const name = String(m.name || '').replace(/\s+/g, ' ').trim().slice(0, 16);
   if (!name) return send({ t: 'joined', to: id, ok: false, reason: 'Please type a name.' });
-  const clash = playerList().find(p => p.id !== id && p.name.toLowerCase() === name.toLowerCase());
-  if (clash) return send({ t: 'joined', to: id, ok: false, reason: `Someone is already using “${name}”. Try a different name!` });
   const uid = typeof m.uid === 'string' ? m.uid.slice(0, 40) : null;
+  const taken = n => playerList().some(p => p.id !== id && p.name.toLowerCase() === n.toLowerCase());
+  let finalName = name;
+  if (taken(name)) {
+    // Signed-in students can't pick their name here, so give them a number (e.g. two "Maya L.").
+    if (!uid) return send({ t: 'joined', to: id, ok: false, reason: `Someone is already using “${name}”. Try a different name!` });
+    for (let n = 2; taken(finalName); n++) finalName = name.slice(0, 13) + ' ' + n;
+  }
   // One account can only play once per game (it can still rejoin from a new tab).
   if (uid) for (const p of G.players.values()) if (p.uid === uid && p.id !== id) G.players.delete(p.id);
   let p = G.players.get(id);
   if (!p) {
-    p = { id, uid, name, av: normalizeAvatar(m.av), score: 0, correct: 0, streak: 0, m: {} };
+    p = { id, uid, name: finalName, av: normalizeAvatar(m.av), score: 0, correct: 0, streak: 0, m: {} };
     G.players.set(id, p);
     if (G.phase !== 'lobby' && mode.addPlayer) mode.addPlayer(ctx, p);
     sfx('join');
-  } else { p.name = name; p.av = normalizeAvatar(m.av); p.uid = uid || p.uid; }
-  send({ t: 'joined', to: id, ok: true, name, coinsOn: G.teacher, state: stateMsg() });
+  } else { p.name = finalName; p.av = normalizeAvatar(m.av); p.uid = uid || p.uid; }
+  send({ t: 'joined', to: id, ok: true, name: finalName, coinsOn: G.teacher, state: stateMsg() });
   if (uid && G.teacher && !p.owned) loadOwned(p);
   renderRoster();
   if (G.phase !== 'lobby' && mode.renderPlayers) mode.renderPlayers(ctx);

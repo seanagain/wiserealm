@@ -68,6 +68,20 @@ async function load() {
     </tbody></table>` : '<p class="muted">Play a game while signed in and it will show up here!</p>';
 }
 
+// Change my name (shown in games, the shop and to my teacher)
+$('#renameBtn').onclick = () => { $('#renameIn').value = $('#name').textContent; $('#renameForm').hidden = false; $('#renameBtn').hidden = true; $('#renameIn').focus(); };
+$('#renameCancel').onclick = () => { $('#renameForm').hidden = true; $('#renameBtn').hidden = false; $('#renameMsg').textContent = ''; };
+$('#renameSave').onclick = async () => {
+  const msg = $('#renameMsg');
+  try {
+    const prof = await accounts.setDisplayName($('#renameIn').value);
+    $('#name').textContent = prof.display_name;
+    $('#renameForm').hidden = true; $('#renameBtn').hidden = false;
+    msg.style.color = 'var(--good)'; msg.textContent = 'Name saved!';
+  } catch (e) { msg.style.color = 'var(--bad)'; msg.textContent = e.message; }
+};
+$('#renameIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#renameSave').click(); });
+
 $('#joinClass').onclick = async () => {
   const code = $('#classCode').value.trim();
   if (!code) return;

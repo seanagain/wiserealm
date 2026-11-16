@@ -34,6 +34,7 @@ function renderLib() {
       <div class="row">
         <button class="btn small" data-edit="${s.id}">Edit</button>
         <button class="btn small" data-dup="${s.id}">Duplicate</button>
+        <button class="btn small danger" data-del="${s.id}">Delete</button>
       </div>
     </div>`).join('') : '<p class="muted">No question sets yet. Click “New question set” to make one.</p>';
 }
@@ -84,6 +85,11 @@ $('#setGrid').addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
   if (t.dataset.play) play(t.dataset.play, t.dataset.game);
   if (t.dataset.edit) openEditor(getSet(t.dataset.edit));
+  if (t.dataset.del) {
+    const s = getSet(t.dataset.del);
+    if (s && confirm(`Delete “${s.title}”? This can’t be undone. If it’s assigned for practice, students will lose access to it.`)) { deleteSet(s.id); renderLib(); }
+    return;
+  }
   if (t.dataset.dup) {
     const s = structuredClone(getSet(t.dataset.dup));
     s.id = uid(8); s.title += ' (copy)';
