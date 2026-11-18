@@ -83,10 +83,13 @@ function intro(html, ms = 2600) {
   return wait(ms).then(() => $('#intro').classList.remove('on'));
 }
 
+let lobbyBc = null;
 const ctx = {
   G, S, code, $, $$, esc, fmt, later, wait, sfx, intro, confetti, sparks, floatText,
   heroHTML, avatarSVG, avatarColor, players: playerList, ranked, heroEls,
   broadcast: () => broadcast(),
+  // Something about the lobby changed (e.g. teams): redraw, and tell the iPads (batched).
+  lobbyChanged: () => { renderRoster(); clearTimeout(lobbyBc); lobbyBc = setTimeout(() => { if (G.phase === 'lobby') broadcast(); }, 400); },
   setStatus: html => { $('#statusLine').innerHTML = html; },
   setRoundMsg: html => { $('#roundMsg').innerHTML = html; },
   stage: null,
@@ -163,8 +166,9 @@ function resync() {
 // database, sends only the ticket, and the projector looks it up with the teacher's login.
 const roster = new Map(), ticketOwner = new Map();
 let pending = [], batchTimer = null, fetching = false;
-function lookupTicket(tk) {
-  if (roster.has(tk)) return Promise.resolve(roster.get(tk));
+function lookupTicket(tk, fresh = false) {
+  // fresh: ask the database again, e.g. a student rejoining after changing clothes in the shop.
+  if (!fresh && roster.has(tk)) return Promise.resolve(roster.get(tk));
   if (!G.teacher) return Promise.resolve(null);
   return new Promise(res => { pending.push({ tk, res }); scheduleRoster(); });
 }
@@ -178,6 +182,25 @@ async function fetchRoster() {
   if (pending.length) scheduleRoster();
 }
 
+// Students can change clothes in the shop between games: check for new looks every 15 seconds
+// in the lobby (a database read, not a live-game message, so it doesn't count toward the limit).
+let refreshing = false;
+async function refreshLooks() {
+  if (!G.teacher || refreshing || !playerList().some(p => p.tk)) return;
+  refreshing = true;
+  try { for (const r of (await accounts.gameRoster(code)) || []) roster.set(r.device, r); } catch (e) { console.warn(e); }
+  refreshing = false;
+  let changed = false;
+  for (const p of playerList()) {
+    const r = p.tk && roster.get(p.tk);
+    if (!r || r.user_id !== p.uid) continue;
+    const av = normalizeAvatar(restrictAvatar(r.avatar || {}, r.owned || []));
+    if (JSON.stringify(av) !== JSON.stringify(p.av)) { p.av = av; p.owned = r.owned || []; changed = true; }
+  }
+  if (changed && G.phase === 'lobby') renderRoster();
+}
+setInterval(() => { if (G.phase === 'lobby' && !document.hidden) refreshLooks(); }, 15000);
+
 const joining = new Set();
 async function handleJoin(m) {
   const id = String(m.id || '').slice(0, 40);
@@ -185,7 +208,7 @@ async function handleJoin(m) {
   if (G.kicked.has(id)) return send({ t: 'joined', to: id, ok: false, reason: 'kicked' });
   const tk = typeof m.tk === 'string' && /^[\w-]{8,64}$/.test(m.tk) ? m.tk : null;
   let acct = null;
-  if (tk) { joining.add(id); try { acct = await lookupTicket(tk); } finally { joining.delete(id); } }
+  if (tk) { joining.add(id); try { acct = await lookupTicket(tk, true); } finally { joining.delete(id); } }
   // A ticket only works for the iPad that used it first.
   if (acct) {
     const owner = ticketOwner.get(tk);
@@ -218,7 +241,7 @@ async function handleJoin(m) {
     if (G.phase !== 'lobby' && mode.addPlayer) mode.addPlayer(ctx, p);
     sfx('join');
   } else { p.name = finalName; p.av = av; p.uid = uid || p.uid; }
-  if (acct) p.owned = acct.owned || [];
+  if (acct) { p.owned = acct.owned || []; p.tk = tk; }
   send({ t: 'joined', to: id, ok: true, name: finalName, coinsOn: G.teacher && !!p.uid, state: stateMsg() });
   renderRoster();
   if (G.phase !== 'lobby' && mode.renderPlayers) mode.renderPlayers(ctx);
@@ -284,10 +307,13 @@ function refreshEmoteToggle() { $('#emoteToggle').textContent = S.emotes === fal
 function fail(msg) { $('#errMsg').textContent = msg; show('errScreen'); }
 
 // ---------------- Lobby ----------------
-const playground = createPlayground($('#roster'), { players: playerList, heroHTML });
+const playground = createPlayground($('#roster'), { players: playerList, heroHTML, teamOf: p => (mode.lobbyTeam ? mode.lobbyTeam(ctx, p) : 0) });
 function renderRoster() {
   $('#playerCount').textContent = playerList().length;
   playground.sync();
+  const mp = $('#modePanel');
+  if (mp && mode.lobbyPanel) mode.lobbyPanel(ctx, mp);
+  else if (mp) { mp.hidden = true; mp.innerHTML = ''; }
 }
 function refreshLock() {
   $('#lockBtn').textContent = G.locked ? '🔒 Room locked' : '🔓 Room open';
@@ -327,6 +353,7 @@ function applyChoice() {
   if (mode.settings) mode.settings(ctx, $('#modeSettings'), () => save('cq_host_settings', S));
   history.replaceState(null, '', `host.html?set=${encodeURIComponent(set.id)}&game=${mode.id}${params.has('debug') ? '&debug' : ''}`);
   refreshAutoToggle();
+  if (G.phase === 'lobby') ctx.lobbyChanged(); // e.g. show or hide the team picker
 }
 
 function setupLobby() {
@@ -671,6 +698,7 @@ function backToLobby() {
   renderRoster();
   broadcast();
   show('lobbyScreen');
+  refreshLooks();
 }
 $('#againBtn').onclick = backToLobby;
 $('#replayBtn').onclick = () => { backToLobby(); startGame(); };

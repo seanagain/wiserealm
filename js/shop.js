@@ -23,7 +23,11 @@ const FREE = [
 const owned = id => isFree(ITEM_BY_ID[id]) || prof.owned.includes(id);
 const savedHero = () => restrictAvatar(prof.avatar, prof.owned);
 const dirty = () => JSON.stringify(restrictAvatar(draft, prof.owned)) !== JSON.stringify(savedHero()) || tryingUnowned();
-const tryingUnowned = () => ITEMS.some(it => draft[it.slot] === it.id && !owned(it.id));
+const tryingUnowned = () => ITEMS.some(it => wornSlot(it) && !owned(it.id));
+// Heroes can have two pets: 'pet' (left) and 'pet2' (right).
+const wornSlot = it => it.slot === 'pet' ? (draft.pet === it.id ? 'pet' : draft.pet2 === it.id ? 'pet2' : null) : (draft[it.slot] === it.id ? it.slot : null);
+const slotFor = it => it.slot !== 'pet' ? it.slot : !draft.pet || draft.pet === it.id ? 'pet' : 'pet2';
+function equip(it) { draft[slotFor(it)] = it.id; }
 
 function note(msg, good = true) { $('#saveNote').textContent = msg; $('#saveNote').style.color = good ? 'var(--good)' : 'var(--bad)'; }
 
@@ -57,10 +61,10 @@ function emoteCard(it) {
 
 function itemCard(it) {
   if (it.slot === 'emote') return emoteCard(it);
-  const preview = avatarSVG(Object.assign({}, draft, { [it.slot]: it.id }));
-  const wearing = draft[it.slot] === it.id;
+  const worn = wornSlot(it), wearing = !!worn;
+  const preview = avatarSVG(wearing ? draft : Object.assign({}, draft, { [slotFor(it)]: it.id }));
   let action;
-  if (owned(it.id)) action = wearing ? `<button class="btn small" data-unequip="${it.slot}">Take off</button>` : `<button class="btn small" data-equip="${it.id}">Wear</button>`;
+  if (owned(it.id)) action = wearing ? `<button class="btn small" data-unequip="${worn}">Take off</button>` : `<button class="btn small" data-equip="${it.id}">Wear</button>`;
   else action = `<button class="btn small primary" data-buy="${it.id}" ${prof.coins < it.price ? 'disabled' : ''}>Buy · ${fmt(it.price)}</button>`;
   return `<div class="item ${wearing ? 'trying' : ''}" data-try="${it.id}">
     <div class="pic">${preview}</div><div class="nm">${esc(it.name)}</div>
@@ -72,7 +76,8 @@ function renderShop(onlyOwned) {
   const html = SLOTS.map(s => {
     const list = ITEMS.filter(it => it.slot === s.id && (!onlyOwned || owned(it.id)));
     if (!list.length) return '';
-    return `<h3 class="slot-title">${s.label}</h3><div class="items">${list.map(itemCard).join('')}</div>`;
+    const tip = s.id === 'pet' ? ' <span class="muted" style="font-size:.8rem">· wear up to 2!</span>' : '';
+    return `<h3 class="slot-title">${s.label}${tip}</h3><div class="items">${list.map(itemCard).join('')}</div>`;
   }).join('');
   $('#panel').innerHTML = html || '<p>You don’t own any items yet. Earn coins by playing games, then visit the <b>Shop</b> tab!</p>';
 }
@@ -100,15 +105,15 @@ $('#panel').addEventListener('click', async e => {
     try {
       prof = await accounts.buy(it.id);
       if (it.slot === 'emote') { render(); note(`You bought the ${it.name} emote! Use it between questions in games. 🎉`); return; }
-      draft[it.slot] = it.id;
+      equip(it);
       await saveHero(`You bought ${it.name}! 🎉`);
     } catch (err) { note(err.message, false); buy.disabled = false; }
     return;
   }
   const eq = e.target.closest('[data-equip]');
-  if (eq) { const it = ITEM_BY_ID[eq.dataset.equip]; draft[it.slot] = it.id; return render(); }
+  if (eq) { equip(ITEM_BY_ID[eq.dataset.equip]); return render(); }
   const un = e.target.closest('[data-unequip]');
-  if (un) { draft[un.dataset.unequip] = null; return render(); }
+  if (un) { draft[un.dataset.unequip] = null; if (!draft.pet && draft.pet2) { draft.pet = draft.pet2; draft.pet2 = null; } return render(); }
   const em = e.target.closest('[data-emote]');
   if (em) { // replay the emote animation on the little hero
     const host = em.querySelector('.emote-preview');
@@ -119,7 +124,9 @@ $('#panel').addEventListener('click', async e => {
   const card = e.target.closest('[data-try]');
   if (card) { // try it on (tap again to take it off)
     const it = ITEM_BY_ID[card.dataset.try];
-    draft[it.slot] = draft[it.slot] === it.id ? null : it.id;
+    const w = wornSlot(it);
+    if (w) draft[w] = null; else equip(it);
+    if (!draft.pet && draft.pet2) { draft.pet = draft.pet2; draft.pet2 = null; }
     render();
   }
 });

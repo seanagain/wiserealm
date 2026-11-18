@@ -58,7 +58,7 @@ const CLOCK = pixels([
   '.hhhh.',
 ], { h: '#1b1430', w: '#f4f1de', k: '#1b1430' });
 
-export function createPlayground(room, { players, heroHTML }) {
+export function createPlayground(room, { players, heroHTML, teamOf = () => 0 }) {
   room.classList.add('classroom');
   room.innerHTML = `
     <div class="cr-wall">
@@ -111,6 +111,8 @@ export function createPlayground(room, { players, heroHTML }) {
         layer.append(el);
         els.set(p.id, el);
       }
+      const t = teamOf(p);
+      el.classList.toggle('team1', t === 1); el.classList.toggle('team2', t === 2);
       const sig = p.name + '|' + JSON.stringify(p.av);
       if (el.dataset.sig !== sig) {
         el.dataset.sig = sig;

@@ -669,3 +669,25 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
   .maze-screen.ter-mode .dpad { grid-template-columns: repeat(3, min(12vw, 118px)); grid-template-rows: repeat(3, min(12vw, 118px)); align-self: center; }
   .maze-screen.ter-mode .mz-q .p-choices { grid-template-columns: 1fr; }
 }
+
+/* Choosing teams (Territory Battle lobby) */
+.tm-panel { border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); background: var(--panel, #241f3d); padding: 10px 12px; margin-bottom: 12px; }
+.tm-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 8px; }
+.tm-head .muted { font-size: .85rem; }
+.tm-cols { display: flex; gap: 10px; }
+.tm-col { flex: 1; min-width: 0; padding: 8px; border: 3px solid var(--ink); display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+.tm-col h3 { width: 100%; margin: 0 0 4px; font-size: .9rem; }
+.tm-col.red { background: rgba(224, 70, 95, .18); border-color: #e0465f; }
+.tm-col.blue { background: rgba(59, 130, 246, .18); border-color: #3b82f6; }
+.tm-col.none { flex: .7; background: rgba(255, 255, 255, .05); }
+.tm-name { font: inherit; font-size: .9rem; color: var(--text); background: var(--ink); border: 2px solid var(--line); padding: 3px 8px; cursor: pointer; }
+.tm-col.red .tm-name { border-color: #e0465f; } .tm-col.blue .tm-name { border-color: #3b82f6; }
+.tm-name:hover { background: #3b3575; }
+.lb-hero.team1 .av-wrap, .lb-hero.team1 > svg { filter: drop-shadow(0 0 3px #ff6b81) drop-shadow(0 0 2px #ff6b81); }
+.lb-hero.team2 .av-wrap, .lb-hero.team2 > svg { filter: drop-shadow(0 0 3px #6aa8ff) drop-shadow(0 0 2px #6aa8ff); }
+.team-pick { padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 520px; }
+.team-pick b { font-size: 1.25rem; }
+.team-btn { font-size: 1.3rem; padding: 14px 22px; min-width: 170px; }
+.team-btn.red { background: #8f2335; } .team-btn.blue { background: #1e4a91; }
+.team-btn.sel { outline: 4px solid var(--gold); outline-offset: 2px; }
+.team-btn:disabled { opacity: .45; }

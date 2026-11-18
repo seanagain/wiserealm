@@ -166,7 +166,7 @@ begin
   perform public.my_profile();
   if jsonb_typeof(p_avatar) <> 'object' or length(p_avatar::text) > 600 then raise exception 'Invalid hero'; end if;
   select * into prof from public.profiles where id = auth.uid() for update;
-  foreach slot in array array['phat', 'top', 'cape', 'acc', 'pet'] loop
+  foreach slot in array array['phat', 'top', 'cape', 'acc', 'pet', 'pet2'] loop
     v := p_avatar ->> slot;
     if v is not null and not (v = any (prof.owned)) then raise exception 'You do not own %', v; end if;
   end loop;

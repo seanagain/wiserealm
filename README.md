@@ -14,7 +14,7 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 | **Four Corners Dash** | Each answer is a corner of the map. Students tap a corner and their hero runs there (they can switch until time's up). Wrong corners turn to lava. 3 hearts each; knocked-out heroes become ghosts who revive after 2 correct answers in a row. |
 | **Treasure Hunt** | A correct answer earns a dig. Diggers pick a spot on the island from their iPads to find gold, gems, chests… or a trap. Luck keeps it close. |
 | **Mr. C’s Maze** | (Optional **⚡ Edison Mode**: purple maze with lightning bolts to zap the Mr. C’s.) Students steer their heroes with arrow buttons on their iPads. Locked gates need a correct answer (everyone unlocks their own). A wild Mr. C roams the maze: if he catches you, answer right to bonk him away or lose a heart. Escape for a big bonus. Everyone plays at their own pace; settings for maze size, time limit and number of Mr. C’s. |
-| **Territory Battle** | Red team vs Blue team. Students walk with arrow buttons and paint the arena their color. Painting uses ink; when it runs out, a correct answer refills it. When two enemies bump into each other, both get the same question: the first right answer wins the duel, splashes paint and sends the other back to base. Most territory when time runs out wins. Each iPad shows the map with the student’s own hero marked YOU (one small update a second; can be turned off). Settings: battlefield (country map with rivers, bridges and mountains; grass field; stone arena; or surprise me), time limit, arena size. |
+| **Territory Battle** | Red team vs Blue team. Students walk with arrow buttons and paint the arena their color. Painting uses ink; when it runs out, a correct answer refills it. When two enemies bump into each other, both get the same question: the first right answer wins the duel, splashes paint and sends the other back to base. Most territory when time runs out wins. Each iPad shows the map with the student’s own hero marked YOU (one small update a second; can be turned off). Teams: random at the start, students pick on their iPads (teams must stay about even), or the teacher sorts them in the lobby. Settings: battlefield (country map with rivers, bridges and mountains; grass field; stone arena; or surprise me), time limit, arena size. |
 
 ## The pages
 
@@ -32,7 +32,7 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
   +30/20/10 for the top 3, +25 if the class beats the boss** (max 300 per game).
 - Coins are only awarded when **you are signed in on the projector** as a teacher. The lobby shows
   "Coins: on" or "Coins: off".
-- The shop has hats, outfits, capes, face items and pets (30 items, 50–400 coins). Students can try
+- The shop has hats, outfits, capes, face items and pets (a hero can wear two pets at once) (30 items, 50–400 coins). Students can try
   anything on before buying. Prices live in the database, so they can't be changed from a browser.
 - On **Students & coins** you can give bonus coins (or take some away with a minus number).
 - Guests can still play every game; they just don't earn coins.

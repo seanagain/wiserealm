@@ -5,7 +5,9 @@
 
 import { ITEM_BY_ID } from './items.js';
 
-export const PREMIUM_SLOTS = ['phat', 'top', 'cape', 'acc', 'pet'];
+export const PREMIUM_SLOTS = ['phat', 'top', 'cape', 'acc', 'pet', 'pet2'];
+// pet2 is a second pet (any item from the Pets shelf), standing on the hero's other side.
+export const SLOT_KIND = { pet2: 'pet' };
 export const CANVAS_W = 26, CANVAS_H = 24, OX = 3; // hero is drawn 3 pixels in from the left
 
 export const SKINS = ['#ffdcb8', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5c3a21'];
@@ -44,8 +46,9 @@ export function normalizeAvatar(a) {
   const out = { cls: n(a.cls, CLASSES), style: n(a.style, STYLES), color: n(a.color, COLORS), skin: n(a.skin, SKINS), hat: n(a.hat, HATS), hc: n(a.hc, COLORS), face: n(a.face, FACES) };
   for (const slot of PREMIUM_SLOTS) {
     const it = ITEM_BY_ID[a[slot]];
-    out[slot] = it && it.slot === slot ? it.id : null;
+    out[slot] = it && it.slot === (SLOT_KIND[slot] || slot) ? it.id : null;
   }
+  if (out.pet2 && out.pet2 === out.pet) out.pet2 = null;
   return out;
 }
 
@@ -297,5 +300,10 @@ export function avatarSVG(a, extraClass = '') {
   else paint(g, HAT_LAYERS[HATS[a.hat].id], pal, OX);
   paint(g, WEAPON_LAYERS[CLASSES[a.cls].id], pal, OX);
   if (item('pet')) layer(item('pet'));
+  const p2 = item('pet2');
+  if (p2) { // mirrored, so it faces the hero
+    const w = Math.max(...p2.rows.map(r => r.length));
+    paint(g, { y: p2.y, x: CANVAS_W - w, rows: p2.rows.map(r => [...r.padEnd(w, '.')].reverse().join('')) }, Object.assign({}, pal, p2.pal));
+  }
   return `<svg class="av ${extraClass}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${gridRects(g)}</svg>`;
 }

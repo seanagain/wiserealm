@@ -145,6 +145,17 @@ async function register() {
     if (r && r.class) classNote = `You’re now in the class “${r.class}”.`;
   } catch (e) { console.warn(e); }
 }
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden || !account || !joined) return;
+  try {
+    const prof = await accounts.profile();
+    const av = restrictAvatar(prof.avatar, prof.owned || []);
+    if (JSON.stringify(av) === JSON.stringify(profile.av)) return;
+    profile.av = av; account.prof = prof;
+    document.querySelectorAll('#waitHero, #mzHero').forEach(el => (el.innerHTML = avatarSVG(av)));
+    sendJoin(); // the projector looks up the new look
+  } catch { /* ignore */ }
+});
 const sendJoin = (viaRoom = false) => toHost({ t: 'join', id: pid, tk: account ? ticketFor(code) : null, acct: !!account, name: profile.name, av: profile.av }, { viaRoom });
 
 // If an update seems to be missing (e.g. the iPad dozed off), politely ask the host to resend.
@@ -286,6 +297,7 @@ function render(s) {
   document.querySelectorAll('.score-label').forEach(el => (el.textContent = s.scoreName || 'Score'));
   if (s.phase === 'lobby' || s.phase === 'intro') {
     myAns = -1; myPick = -1;
+    renderTeamPick(s);
     if (shownKey === key) return;
     shownKey = key;
     showWait(s.phase === 'intro' ? text(s).intro : 'You’re in!',
@@ -332,6 +344,32 @@ function render(s) {
     renderEnd(s);
   }
 }
+
+// Territory Battle: pick a team in the lobby (when the teacher allows it).
+function renderTeamPick(s) {
+  const how = s.phase === 'lobby' && s.mode === 'territory' ? s.teamPick : null;
+  const box = $('#teamPick');
+  box.hidden = !how || how === 'random';
+  if (box.hidden) return;
+  const mine = (s.teams && s.teams[pid]) || 0, size = s.tsize || [0, 0, 0];
+  const name = ['', '🟥 Red', '🟦 Blue'];
+  $('#teamBtns').hidden = how !== 'pick';
+  $('#teamPickTitle').textContent = how === 'pick' ? (mine ? `You’re on ${name[mine]}! Tap to switch.` : 'Pick your team!') : (mine ? `You’re on ${name[mine]}!` : 'Your teacher is choosing teams…');
+  let full = false;
+  box.querySelectorAll('[data-team]').forEach(b => {
+    const t = +b.dataset.team, other = 3 - t;
+    const isFull = t !== mine && size[t] - 0 >= size[other] - (mine === other ? 1 : 0) + 2;
+    b.disabled = isFull; b.classList.toggle('sel', t === mine);
+    b.textContent = `${name[t]} · ${size[t]}${isFull ? ' (full for now)' : ''}`;
+    full = full || isFull;
+  });
+  $('#teamPickNote').textContent = how === 'pick' ? (full ? 'Teams must stay even. Wait for someone to join the other team.' : 'Teams must stay about even.') : '';
+}
+$('#teamBtns').addEventListener('click', e => {
+  const b = e.target.closest('[data-team]'); if (!b || b.disabled) return;
+  toHost({ t: 'team', id: pid, team: +b.dataset.team });
+  b.classList.add('sel');
+});
 
 function showWait(title, sub, lobby = false) {
   $('#waitSignIn').hidden = !!account;

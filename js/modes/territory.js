@@ -110,7 +110,8 @@ function teamSizes(ctx) {
 function ensure(ctx, p, team) {
   if (p.m && p.m.team) return;
   const T = ctx.G.extra, s = teamSizes(ctx);
-  const t = team || (s[1] <= s[2] ? 1 : 2);
+  const chosen = ctx.S.terTeams && ctx.S.terTeams !== 'random' && (p.team === 1 || p.team === 2) ? p.team : 0;
+  const t = team || chosen || (s[1] <= s[2] ? 1 : 2);
   p.m = { team: t, x: baseX(T, t), y: Math.floor(Math.random() * T.H), dir: null, dirAt: 0, last: 0, busy: null, ink: INK_MAX,
     cool: 0, safe: 0, frozen: 0, qorder: [], tiles: 0, wins: 0 };
   p.asked = p.asked || 0;
@@ -386,11 +387,16 @@ export default {
     const { S } = ctx;
     S.terMins = S.terMins || 5; S.terSize = S.terSize || 'auto'; S.terMap = S.terMap || 'country';
     if (S.terPads === undefined) S.terPads = true;
+    S.terTeams = S.terTeams || 'random';
     el.innerHTML = `<label>Time limit <select id="terMins">${[3, 4, 5, 6, 8, 10].map(m => `<option value="${m}">${m} min</option>`).join('')}</select></label>
       <label>Battlefield <select id="terMap">${Object.entries(MAPS).map(([k, m]) => `<option value="${k}">${m.name}</option>`).join('')}<option value="random">Surprise me</option></select></label>
       <label>Arena size <select id="terSize"><option value="auto">Auto (by players)</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+      <label>Teams <select id="terTeams"><option value="random">Random (at start)</option><option value="pick">Students pick</option><option value="teacher">I’ll choose</option></select></label>
       <label title="Each student sees the map and their own hero on their iPad">Map on iPads <input type="checkbox" id="terPads"></label>
-      <p class="muted" style="margin:-6px 0 0;font-size:.8rem">Teams are split evenly when the game starts. The iPad map adds about 1 message per student per second.</p>`;
+      <p class="muted" style="margin:-6px 0 0;font-size:.8rem">Random teams are split evenly when the game starts. The iPad map adds about 1 message per student per second.</p>`;
+    const tm = el.querySelector('#terTeams');
+    tm.value = S.terTeams;
+    tm.onchange = () => { S.terTeams = tm.value; persist(); ctx.lobbyChanged(); };
     const pads = el.querySelector('#terPads');
     pads.checked = S.terPads !== false;
     pads.onchange = () => { S.terPads = pads.checked; persist(); };
@@ -409,11 +415,17 @@ export default {
       <div class="mz-side"><div class="card mz-timer-card"><div class="muted">TIME LEFT</div><div class="mz-timer" id="mzTimer">--:--</div></div>
       <div class="card cboard" id="mzSide"></div></div></div>`;
     ctx.G.extra = build(ctx);
-    // Split teams evenly (shuffled, so friends aren't always together).
     const list = ctx.players().slice();
     for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
     for (const p of list) p.m = {};
-    list.forEach((p, i) => ensure(ctx, p, (i % 2) + 1));
+    if ((ctx.S.terTeams || 'random') === 'random') {
+      // Split teams evenly (shuffled, so friends aren't always together).
+      list.forEach((p, i) => ensure(ctx, p, (i % 2) + 1));
+    } else {
+      // Teams picked in the lobby; anyone without a team joins the smaller one.
+      for (const p of list) if (p.team === 1 || p.team === 2) ensure(ctx, p, p.team);
+      for (const p of list) ensure(ctx, p);
+    }
     drawBoard(ctx);
     renderSide(ctx);
   },
@@ -458,7 +470,55 @@ export default {
     });
   },
 
+  // ---- Choosing teams in the lobby ----
+  lobbyPanel(ctx, el) {
+    const { S, esc } = ctx, how = S.terTeams || 'random';
+    if (how === 'random') { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    const list = ctx.players(), on = t => list.filter(p => (p.team || 0) === t);
+    const names = t => on(t).map(p => `<button class="tm-name" data-tm="${esc(p.id)}" title="Click to move">${esc(p.name)}${p.bot ? ' 🤖' : ''}</button>`).join('') || '<span class="muted">nobody yet</span>';
+    const none = on(0);
+    el.innerHTML = `<div class="tm-head"><b>${how === 'pick' ? '📱 Students pick a team on their iPads.' : '👆 Click a name to move them.'}</b>
+        <span class="muted">${how === 'pick' ? 'Click a name to move them.' : ''} No team yet = put on the smaller team at the start.</span>
+        <span class="spacer"></span>
+        <button class="btn small" data-tact="even">⚖ Even out</button><button class="btn small" data-tact="shuffle">🔀 Shuffle</button><button class="btn small" data-tact="clear">Clear</button></div>
+      <div class="tm-cols">
+        <div class="tm-col red"><h3>🟥 Red · ${on(1).length}</h3>${names(1)}</div>
+        ${none.length ? `<div class="tm-col none"><h3>No team · ${none.length}</h3>${names(0)}</div>` : ''}
+        <div class="tm-col blue"><h3>🟦 Blue · ${on(2).length}</h3>${names(2)}</div>
+      </div>`;
+    el.onclick = e => {
+      const nm = e.target.closest('[data-tm]'), act = e.target.closest('[data-tact]');
+      if (nm) { const p = ctx.G.players.get(nm.dataset.tm); if (p) p.team = p.team === 1 ? 2 : 1; }
+      else if (act) {
+        const a = act.dataset.tact;
+        if (a === 'clear') for (const p of list) p.team = 0;
+        else if (a === 'shuffle') {
+          const l = list.slice();
+          for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; }
+          l.forEach((p, i) => (p.team = (i % 2) + 1));
+        } else if (a === 'even') {
+          for (const p of on(0)) p.team = on(1).length <= on(2).length ? 1 : 2;
+          for (let big = on(1).length > on(2).length ? 1 : 2; Math.abs(on(1).length - on(2).length) > 1;) {
+            const l = on(big); l[l.length - 1].team = 3 - big; // move the last one listed
+          }
+        }
+      } else return;
+      ctx.lobbyChanged();
+    };
+  },
+  lobbyTeam(ctx, p) { return (ctx.S.terTeams || 'random') !== 'random' ? p.team || 0 : 0; },
+
   onMessage(ctx, m) {
+    if (m.t === 'team' && ctx.G.phase === 'lobby') {
+      const p = ctx.G.players.get(m.id), t = +m.team;
+      if (!p || ctx.S.terTeams !== 'pick' || (t !== 1 && t !== 2) || p.team === t) return;
+      const size = k => ctx.players().filter(q => q !== p && q.team === k).length;
+      if (size(t) >= size(3 - t) + 2) return; // that team is full for now
+      p.team = t;
+      ctx.lobbyChanged();
+      return;
+    }
     if (ctx.G.phase !== 'play') return;
     const p = ctx.G.players.get(m.id); if (!p) return;
     ensure(ctx, p);
@@ -471,7 +531,15 @@ export default {
   addPlayer(ctx, p) { p.m = {}; p.asked = 0; ensure(ctx, p); drawBoard(ctx); renderSide(ctx); },
   rejoin(ctx, p) { const b = p.m && p.m.busy; if (b && b.token !== 'waiting') sendQ(ctx, p); },
 
-  publicState(ctx) { const T = ctx.G.extra; return T && T.endAt ? { left: Math.max(0, T.endAt - performance.now()), pads: padsOn(ctx) } : { pads: padsOn(ctx) }; },
+  publicState(ctx) {
+    const T = ctx.G.extra;
+    if (ctx.G.phase === 'lobby') {
+      const how = ctx.S.terTeams || 'random', list = ctx.players();
+      if (how === 'random') return { teamPick: 'random' };
+      return { teamPick: how, teams: Object.fromEntries(list.filter(p => !p.bot).map(p => [p.id, p.team || 0])), tsize: [0, 1, 2].map(t => list.filter(p => (p.team || 0) === t).length) };
+    }
+    return T && T.endAt ? { left: Math.max(0, T.endAt - performance.now()), pads: padsOn(ctx) } : { pads: padsOn(ctx) };
+  },
   tag(ctx, p) { return teamTag(p); },
   hud(ctx) { const T = ctx.G.extra; if (!T || !T.own) return ''; const c = counts(T); return `🟥 ${Math.round((100 * c.red) / c.total)}% · 🟦 ${Math.round((100 * c.blue) / c.total)}%`; },
 
