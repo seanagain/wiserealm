@@ -3,20 +3,15 @@
 // from opposite teams bump into each other, BOTH get the same question: whoever answers right
 // first wins the duel, splashes paint around and sends the loser back to base.
 // The team that owns the most of the arena when time runs out wins.
-const STEP_MS = 200, INK_MAX = 10, DUEL_MS = 15000;
+import { TEAMS, MAPS, isBase, mapSVG, paintCell, encodeMap, encodeOwn, heroTag } from '../terview.js';
+export { MAPS };
+const STEP_MS = 200, INK_MAX = 10, DUEL_MS = 15000, TICK_MS = 1000;
 const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
-const TEAMS = [null, { name: 'Red', emoji: '🟥', color: '#e0465f', dark: '#8f2335', css: 'var(--bad)' }, { name: 'Blue', emoji: '🟦', color: '#3b82f6', dark: '#1e4a91', css: '#4cc9f0' }];
 
 // ---------------- Battlefields ----------------
 // Every map is mirrored left/right so it's fair for both teams. T.kind says what is on each
 // tile: '' = open ground, or a blocker ('rock', 'bush', 'hay', 'water', 'mount') that heroes
 // can't walk through. T.deco holds decorations you CAN walk on ('tree', 'bridge', 'sand', 'flower').
-export const MAPS = {
-  country: { name: 'Country map', ground: ['#7bbf5a', '#71b552'], paint: 0.78 },
-  field: { name: 'Grass field', ground: ['#4fa346', '#46983e'], paint: 0.68 },
-  arena: { name: 'Stone arena', ground: ['#2a2540', '#26213a'], paint: 1 },
-};
-
 const grid = (W, H, v) => Array.from({ length: H }, () => Array(W).fill(v));
 const rnd = n => Math.floor(Math.random() * n);
 
@@ -103,7 +98,6 @@ function build(ctx) {
   }
 }
 
-const isBase = (T, x) => x === 0 || x === T.W - 1;
 const baseX = (T, team) => (team === 1 ? 0 : T.W - 1);
 const pct = (T, x, y) => ({ left: ((x + 0.5) / T.W) * 100 + '%', top: ((y + 0.5) / T.H) * 100 + '%' });
 
@@ -131,64 +125,12 @@ function fitBoard(ctx) {
   board.style.width = w + 'px'; board.style.height = w / ratio + 'px';
 }
 
-// Paint sits on top of the ground as a see-through layer, so the map still shows.
-function paintOf(T, x, y) {
-  const o = T.own[y][x];
-  if (!o) return { fill: '#000', op: 0 };
-  return { fill: isBase(T, x) ? TEAMS[o].dark : TEAMS[o].color, op: isBase(T, x) ? 0.92 : MAPS[T.map].paint };
-}
-
-const R = (x, y, w, h, c, extra = '') => `<rect x="${+x.toFixed(3)}" y="${+y.toFixed(3)}" width="${w}" height="${h}" fill="${c}"${extra}/>`;
-function blocker(k, x, y) {
-  switch (k) {
-    case 'water': return R(x, y, 1.02, 1.02, '#173a6b') + R(x + 0.1, y + 0.28, 0.34, 0.09, '#5fd3e8') + R(x + 0.18, y + 0.2, 0.18, 0.09, '#5fd3e8') + R(x + 0.55, y + 0.68, 0.34, 0.09, '#5fd3e8') + R(x + 0.63, y + 0.6, 0.18, 0.09, '#5fd3e8');
-    case 'mount': return R(x + 0.05, y + 0.62, 0.9, 0.36, '#6d6475') + R(x + 0.2, y + 0.38, 0.6, 0.26, '#857b8f') + R(x + 0.34, y + 0.14, 0.32, 0.26, '#9c93a6') + R(x + 0.38, y + 0.14, 0.24, 0.1, '#ffffff') + R(x + 0.05, y + 0.9, 0.9, 0.08, '#4d4655');
-    case 'hay': return R(x + 0.1, y + 0.28, 0.8, 0.62, '#e2b84a') + R(x + 0.1, y + 0.28, 0.8, 0.1, '#f5d77a') + R(x + 0.3, y + 0.28, 0.07, 0.62, '#b88a2a') + R(x + 0.63, y + 0.28, 0.07, 0.62, '#b88a2a') + R(x + 0.1, y + 0.84, 0.8, 0.06, '#8a6620');
-    case 'bush': return R(x + 0.12, y + 0.3, 0.76, 0.6, '#2e7d32') + R(x + 0.25, y + 0.15, 0.5, 0.3, '#388e3c') + R(x + 0.3, y + 0.22, 0.18, 0.12, '#66bb6a') + R(x + 0.12, y + 0.82, 0.76, 0.08, '#1b5e20');
-    default: return R(x, y, 1.02, 1.02, '#4a4560') + R(x + 0.15, y + 0.15, 0.7, 0.6, '#6b6585') + R(x + 0.15, y + 0.15, 0.7, 0.15, '#8d87a8');
-  }
-}
-function decoration(d, x, y) {
-  switch (d) {
-    case 'tree': return R(x + 0.45, y + 0.6, 0.12, 0.25, '#6b4226') + R(x + 0.28, y + 0.2, 0.46, 0.44, '#2f7d32') + R(x + 0.36, y + 0.1, 0.3, 0.14, '#3c9a40') + R(x + 0.34, y + 0.26, 0.12, 0.1, '#6cc26f');
-    case 'flower': return R(x + 0.3, y + 0.4, 0.1, 0.1, '#fff7c2') + R(x + 0.62, y + 0.66, 0.1, 0.1, '#ffd23f');
-    default: return '';
-  }
-}
-function groundOf(T, x, y) {
-  const g = MAPS[T.map].ground, d = T.deco[y][x];
-  if (d === 'bridge') return R(x, y, 1.02, 1.02, '#173a6b') + R(x, y + 0.1, 1.02, 0.8, '#a0703f') + R(x + 0.32, y + 0.1, 0.06, 0.8, '#7a5230') + R(x + 0.65, y + 0.1, 0.06, 0.8, '#7a5230');
-  if (d === 'sand') return R(x, y, 1.02, 1.02, (x + y) % 2 ? '#e0cf8a' : '#d8c47c');
-  if (T.map === 'field') return R(x, y, 1.02, 1.02, g[Math.floor(x / 2) % 2]); // mowing stripes
-  return R(x, y, 1.02, 1.02, g[(x + y) % 2]);
-}
-function fieldLines(T) {
-  if (T.map !== 'field') return '';
-  const { W, H } = T, c = 'stroke="#fff" stroke-opacity=".55" stroke-width=".09" fill="none"';
-  const box = Math.min(3, Math.floor(H / 3));
-  return `<g shape-rendering="geometricPrecision"><rect x="1.05" y=".05" width="${W - 2.1}" height="${H - 0.1}" ${c}/><line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${H}" ${c}/>
-    <circle cx="${W / 2}" cy="${H / 2}" r="${Math.min(2.2, H / 4)}" ${c}/><rect x="1" y="${(H - box * 2) / 2}" width="2.5" height="${box * 2}" ${c}/><rect x="${W - 3.5}" y="${(H - box * 2) / 2}" width="2.5" height="${box * 2}" ${c}/></g>`;
-}
-
 function drawBoard(ctx) {
   const { $, G, esc, heroEls, avatarSVG, players } = ctx, T = G.extra;
   const board = $('#mzBoard');
   fitBoard(ctx);
-  let ground = '', paint = '', top = '';
-  for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
-    if (T.rock[y][x]) {
-      if (T.kind[y][x] !== 'water' && T.kind[y][x] !== 'rock') ground += groundOf(T, x, y);
-      top += blocker(T.kind[y][x], x, y);
-      continue;
-    }
-    ground += groundOf(T, x, y);
-    const pt = paintOf(T, x, y);
-    paint += `<rect id="tt${x}_${y}" x="${x}" y="${y}" width="1.02" height="1.02" fill="${pt.fill}" fill-opacity="${pt.op}"/>`;
-    top += decoration(T.deco[y][x], x, y);
-  }
-  const lbl = ['🟥 BASE', '🟦 BASE'];
-  board.innerHTML = `<svg class="mz-walls" viewBox="0 0 ${T.W} ${T.H}" preserveAspectRatio="none" shape-rendering="crispEdges">${ground}${paint}${fieldLines(T)}${top}</svg>` +
-    `<div class="ter-base" style="left:${pct(T, 0, -0.1).left};top:3%">${lbl[0]}</div><div class="ter-base" style="left:${pct(T, T.W - 1, 0).left};top:3%">${lbl[1]}</div>`;
+  board.innerHTML = mapSVG(T, 'tt') +
+    `<div class="ter-base" style="left:${pct(T, 0, -0.1).left};top:3%">🟥 BASE</div><div class="ter-base" style="left:${pct(T, T.W - 1, 0).left};top:3%">🟦 BASE</div>`;
   board.style.setProperty('--tile', (100 / T.W) + '%');
   heroEls.clear();
   for (const p of players()) {
@@ -203,10 +145,7 @@ function drawBoard(ctx) {
   }
 }
 
-function paintTile(T, x, y) {
-  const el = document.getElementById(`tt${x}_${y}`);
-  if (el) { const pt = paintOf(T, x, y); el.setAttribute('fill', pt.fill); el.setAttribute('fill-opacity', pt.op); }
-}
+const paintTile = (T, x, y) => paintCell(T, x, y, 'tt');
 
 function place(ctx, p) {
   const T = ctx.G.extra, el = ctx.heroEls.get(p.id); if (!el) return;
@@ -226,6 +165,36 @@ function counts(T) {
   const c = [0, 0, 0]; let total = 0;
   for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) if (!T.rock[y][x]) { c[T.own[y][x]]++; total++; }
   return { red: c[1], blue: c[2], total };
+}
+
+// ---------------- The map on the iPads ----------------
+// The map is sent once (and again only if an iPad asks, e.g. after a reload). After that, ONE small
+// update a second goes to everyone, and none at all while nothing changes, to save Supabase messages.
+const padsOn = ctx => ctx.S.terPads !== false;
+function syncRoster(ctx) {
+  const T = ctx.G.extra, list = ctx.players();
+  const key = list.map(p => p.id + ':' + (p.m && p.m.team)).join('|');
+  if (key !== T.rosterKey) { T.rosterKey = key; T.roster = list; T.ver = T.ver ? T.ver + 1 : 1 + Math.floor(Math.random() * 1e6); return true; }
+  return false;
+}
+function sendMap(ctx, force) {
+  const T = ctx.G.extra, now = performance.now();
+  if (!T || !padsOn(ctx) || (!force && now - (T.mapAt || 0) < 1500)) return;
+  T.mapAt = now;
+  syncRoster(ctx);
+  ctx.send({ t: 'tmap', v: T.ver, ...encodeMap(T), pl: T.roster.map(p => [heroTag(ctx.code, p.id), p.name, p.m ? p.m.team : 0, p.av]) });
+  T.tickSig = ''; // follow with a fresh update
+}
+function tick(ctx, now) {
+  const T = ctx.G.extra;
+  if (!padsOn(ctx) || !ctx.players().some(p => !p.bot)) return;
+  if (syncRoster(ctx)) sendMap(ctx, true); // someone joined or left
+  const o = encodeOwn(T);
+  const ps = T.roster.map(p => p.m && p.m.team ? [p.m.x, p.m.y, (p.m.busy ? 1 : 0) | (now < p.m.frozen ? 2 : 0) | (now < p.m.safe ? 4 : 0), Math.min(99, p.m.ink)] : [-9, -9, 0, 0]);
+  const sig = o + JSON.stringify(ps);
+  if (sig === T.tickSig && now - (T.tickAt || 0) < 5000) return;
+  T.tickSig = sig; T.tickAt = now;
+  ctx.send({ t: 'tt', v: T.ver, o, p: ps });
 }
 
 function event(ctx, html) { ctx.setRoundMsg(html); }
@@ -416,10 +385,15 @@ export default {
   settings(ctx, el, persist) {
     const { S } = ctx;
     S.terMins = S.terMins || 5; S.terSize = S.terSize || 'auto'; S.terMap = S.terMap || 'country';
+    if (S.terPads === undefined) S.terPads = true;
     el.innerHTML = `<label>Time limit <select id="terMins">${[3, 4, 5, 6, 8, 10].map(m => `<option value="${m}">${m} min</option>`).join('')}</select></label>
       <label>Battlefield <select id="terMap">${Object.entries(MAPS).map(([k, m]) => `<option value="${k}">${m.name}</option>`).join('')}<option value="random">Surprise me</option></select></label>
       <label>Arena size <select id="terSize"><option value="auto">Auto (by players)</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
-      <p class="muted" style="margin:-6px 0 0;font-size:.8rem">Teams are split evenly when the game starts.</p>`;
+      <label title="Each student sees the map and their own hero on their iPad">Map on iPads <input type="checkbox" id="terPads"></label>
+      <p class="muted" style="margin:-6px 0 0;font-size:.8rem">Teams are split evenly when the game starts. The iPad map adds about 1 message per student per second.</p>`;
+    const pads = el.querySelector('#terPads');
+    pads.checked = S.terPads !== false;
+    pads.onchange = () => { S.terPads = pads.checked; persist(); };
     const mn = el.querySelector('#terMins'), sz = el.querySelector('#terSize');
     const mp = el.querySelector('#terMap');
     mn.value = S.terMins; sz.value = S.terSize; mp.value = S.terMap;
@@ -447,6 +421,7 @@ export default {
   async start(ctx) {
     fitBoard(ctx);
     ctx.broadcast(); // tells each iPad its team
+    sendMap(ctx, true);
     ctx.sfx('warning');
     await ctx.intro(`<span style="color:var(--bad)">🟥 RED</span> vs <span style="color:#4cc9f0">BLUE 🟦</span><br>TERRITORY BATTLE!<br><span style="font-size:.5em" class="muted">Paint the arena with your team. Bump an enemy to duel!</span>`, 3400);
   },
@@ -456,7 +431,7 @@ export default {
     T.endAt = performance.now() + (S.terMins || 5) * 60000;
     fitBoard(ctx);
     ctx.broadcast();
-    let lastSide = 0;
+    let lastSide = 0, lastTick = 0;
     return new Promise(resolve => {
       const iv = setInterval(() => {
         const now = performance.now();
@@ -476,6 +451,7 @@ export default {
           else if (ctx.heroEls.get(p.id)?.classList.contains('done') && now >= p.m.frozen) place(ctx, p);
         }
         checkDuels(ctx, now);
+        if (now - lastTick >= TICK_MS) { lastTick = now; tick(ctx, now); }
         if (now - lastSide > 700) { lastSide = now; renderSide(ctx); }
       }, 60);
       G.timers.push(iv);
@@ -488,13 +464,14 @@ export default {
     ensure(ctx, p);
     if (m.t === 'dir') { p.m.dir = DIRS[m.d] ? m.d : null; p.m.dirAt = performance.now(); }
     else if (m.t === 'mans') answer(ctx, p, m.k, m.c);
+    else if (m.t === 'tneed') sendMap(ctx);
   },
 
   renderPlayers(ctx) { if (ctx.G.phase === 'play' || ctx.G.phase === 'intro') { fitBoard(ctx); if (ctx.heroEls.size !== ctx.players().length) drawBoard(ctx); renderSide(ctx); } },
   addPlayer(ctx, p) { p.m = {}; p.asked = 0; ensure(ctx, p); drawBoard(ctx); renderSide(ctx); },
   rejoin(ctx, p) { const b = p.m && p.m.busy; if (b && b.token !== 'waiting') sendQ(ctx, p); },
 
-  publicState(ctx) { const T = ctx.G.extra; return T && T.endAt ? { left: Math.max(0, T.endAt - performance.now()) } : {}; },
+  publicState(ctx) { const T = ctx.G.extra; return T && T.endAt ? { left: Math.max(0, T.endAt - performance.now()), pads: padsOn(ctx) } : { pads: padsOn(ctx) }; },
   tag(ctx, p) { return teamTag(p); },
   hud(ctx) { const T = ctx.G.extra; if (!T || !T.own) return ''; const c = counts(T); return `🟥 ${Math.round((100 * c.red) / c.total)}% · 🟦 ${Math.round((100 * c.blue) / c.total)}%`; },
 

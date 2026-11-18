@@ -5,6 +5,7 @@ import { $, esc, show, uid, load, save, fmt, CHOICE_STYLE } from './common.js';
 import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
 import { usableEmotes } from './emotes.js';
+import { createTerPad } from './terpad.js';
 import { avatarSVG, normalizeAvatar, restrictAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES, STYLES } from './avatar.js';
 
 // One ID per device so a student who reloads keeps their score.
@@ -215,6 +216,8 @@ function onMsg(m) {
     }
   } else if (m.t === 'mq' || m.t === 'mres') {
     if (joined) mazeMsg(m);
+  } else if (m.t === 'tmap' || m.t === 'tt') {
+    if (joined) terPad.onMsg(m);
   } else if (m.t === 'reg') {
     // The teacher just signed in on the projector: register again so coins work.
     if (account && joined) register().then(() => sendJoin());
@@ -454,8 +457,12 @@ function renderMaze(s) {
     $('#mzHero').innerHTML = avatarSVG(profile.av);
     $('#mzQ').hidden = true; $('#dpad').hidden = false;
     $('#mzMsg').className = 'card mz-msg';
+    const pads = s.mode === 'territory' && s.pads;
+    $('#s-maze').classList.toggle('ter-mode', !!pads);
+    $('#terPad').hidden = !pads;
+    if (pads) terPad.ready();
     $('#mzMsg').textContent = s.mode === 'territory'
-      ? `You’re on ${tag ? 'the ' + tag : 'a team'}! Walk with the arrows to paint the arena. Bump into an enemy to duel: answer first to win!`
+      ? `You’re on ${tag ? 'the ' + tag : 'a team'}! Walk with the arrows to paint the ${pads ? 'map. Your hero is the one marked YOU.' : 'arena.'} Bump into an enemy to duel: answer first to win!`
       : 'Use the arrows to move your hero through the maze. Watch the big screen!';
     show('s-maze');
     clearInterval(mzClock);
@@ -486,6 +493,12 @@ const KEYS = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', w:
 const padActive = () => ($('#s-maze').classList.contains('active') && !$('#dpad').hidden) || ($('#s-wait').classList.contains('active') && !$('#lobbyPad').hidden);
 document.addEventListener('keydown', e => { if (padActive() && KEYS[e.key]) { e.preventDefault(); setDir(KEYS[e.key]); } });
 document.addEventListener('keyup', e => { if (KEYS[e.key] && KEYS[e.key] === mzDir) setDir(null); });
+
+const terPad = createTerPad({
+  box: $('#terPad'), getCode: () => code, pid, avatarSVG, toHost,
+  getDir: () => mzDir, canMove: () => !mzToken && !mzDone,
+  active: () => $('#s-maze').classList.contains('active') && !$('#terPad').hidden,
+});
 
 function mazeMsg(m) {
   if (!$('#s-maze').classList.contains('active')) { shownKey = null; renderMaze(last || { phase: 'play' }); }

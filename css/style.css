@@ -645,3 +645,27 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 .ter-hero.empty::after { content: '🖌?'; position: absolute; right: -10px; top: -4px; font-size: 11px; background: var(--ink); padding: 0 2px; }
 .ter-hero.team1 .av-wrap { filter: drop-shadow(0 0 2px #ff6b81) drop-shadow(0 0 2px #ff6b81); }
 .ter-hero.team2 .av-wrap { filter: drop-shadow(0 0 2px #6aa8ff) drop-shadow(0 0 2px #6aa8ff); }
+
+/* Territory Battle map on the iPad */
+.tp-wrap { width: 100%; max-width: 980px; display: grid; place-items: center; }
+.tp-board { width: min(100%, calc(44vh * var(--ratio))); aspect-ratio: var(--ratio); overflow: visible; margin-top: 26px; }
+.tp-board > .mz-walls { overflow: hidden; }
+.tp-hero { width: calc(var(--tile) * 1.35); transition: left .95s linear, top .95s linear; }
+.tp-hero .nm { display: none; }
+.tp-hero.me { width: calc(var(--tile) * 1.7); transition: left .12s steps(2), top .12s steps(2); }
+.tp-hero.me .av-wrap { filter: drop-shadow(0 0 0 #fff) drop-shadow(2px 0 0 #ffd23f) drop-shadow(-2px 0 0 #ffd23f) drop-shadow(0 2px 0 #ffd23f) drop-shadow(0 -2px 0 #ffd23f); }
+.tp-you { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-family: var(--pixel); font-size: 10px; background: var(--gold); color: var(--ink); padding: 2px 5px; border: 2px solid var(--ink); white-space: nowrap; animation: tpBob .8s steps(2) infinite; }
+@keyframes tpBob { 50% { transform: translate(-50%, -3px); } }
+.maze-screen.ter-mode { gap: 10px; padding-top: 10px; }
+.maze-screen.ter-mode .mz-msg { min-height: 0; padding: 10px; font-size: 1rem; }
+.maze-screen.ter-mode .dpad { grid-template-columns: repeat(3, min(22vw, 118px)); grid-template-rows: repeat(3, min(22vw, 118px)); margin-top: 0; }
+@media (orientation: landscape) {
+  .maze-screen.ter-mode.active { display: grid; grid-template-columns: minmax(0, 1fr) min(400px, 40vw); grid-template-areas: "hud hud" "msg msg" "map pad"; align-content: start; justify-items: center; column-gap: 16px; }
+  .maze-screen.ter-mode .mz-hud { grid-area: hud; max-width: none; }
+  .maze-screen.ter-mode .mz-msg { grid-area: msg; max-width: none; }
+  .maze-screen.ter-mode .tp-wrap { grid-area: map; }
+  .maze-screen.ter-mode .dpad, .maze-screen.ter-mode .mz-q { grid-area: pad; }
+  .maze-screen.ter-mode .tp-board { width: min(100%, calc((100dvh - 190px) * var(--ratio))); }
+  .maze-screen.ter-mode .dpad { grid-template-columns: repeat(3, min(12vw, 118px)); grid-template-rows: repeat(3, min(12vw, 118px)); align-self: center; }
+  .maze-screen.ter-mode .mz-q .p-choices { grid-template-columns: 1fr; }
+}
