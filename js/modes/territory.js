@@ -6,21 +6,101 @@
 const STEP_MS = 200, INK_MAX = 10, DUEL_MS = 15000;
 const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 const TEAMS = [null, { name: 'Red', emoji: '🟥', color: '#e0465f', dark: '#8f2335', css: 'var(--bad)' }, { name: 'Blue', emoji: '🟦', color: '#3b82f6', dark: '#1e4a91', css: '#4cc9f0' }];
-const NEUTRAL = ['#2a2540', '#26213a'];
+
+// ---------------- Battlefields ----------------
+// Every map is mirrored left/right so it's fair for both teams. T.kind says what is on each
+// tile: '' = open ground, or a blocker ('rock', 'bush', 'hay', 'water', 'mount') that heroes
+// can't walk through. T.deco holds decorations you CAN walk on ('tree', 'bridge', 'sand', 'flower').
+export const MAPS = {
+  country: { name: 'Country map', ground: ['#7bbf5a', '#71b552'], paint: 0.78 },
+  field: { name: 'Grass field', ground: ['#4fa346', '#46983e'], paint: 0.68 },
+  arena: { name: 'Stone arena', ground: ['#2a2540', '#26213a'], paint: 1 },
+};
+
+const grid = (W, H, v) => Array.from({ length: H }, () => Array(W).fill(v));
+const rnd = n => Math.floor(Math.random() * n);
+
+function genArena(T) {
+  for (let i = 0; i < Math.round(T.W * T.H / 22); i++) T.set(3 + rnd(T.W / 2 - 3), rnd(T.H), 'rock');
+}
+
+function genField(T) {
+  // A sports field: a few hay bales and bushes, and a clear middle so teams meet there.
+  for (let i = 0; i < Math.round(T.W * T.H / 30); i++) {
+    const x = 2 + rnd(T.W / 2 - 3), y = rnd(T.H);
+    if (Math.abs(y - (T.H - 1) / 2) < 1.5 && x > T.W / 2 - 4) continue;
+    T.set(x, y, Math.random() < 0.5 ? 'hay' : 'bush');
+  }
+  for (let i = 0; i < T.W; i++) { const x = 1 + rnd(T.W / 2 - 1), y = rnd(T.H); if (!T.kind[y][x]) T.dec(x, y, 'flower'); }
+}
+
+function genCountry(T) {
+  const { W, H } = T, half = W / 2;
+  // Coastline: the sea nibbles in from the top and bottom edges.
+  let top = 0, bot = 0;
+  const deep = H >= 11 ? 2 : 1;
+  for (let x = 1; x < half - 1; x++) {
+    top = Math.max(0, Math.min(deep, top + rnd(3) - 1 - (Math.random() < 0.3))); bot = Math.max(0, Math.min(deep, bot + rnd(3) - 1 - (Math.random() < 0.3)));
+    for (let y = 0; y < top; y++) T.set(x, y, 'water');
+    for (let y = 0; y < bot; y++) T.set(x, H - 1 - y, 'water');
+  }
+  // A river down the middle, with bridges to cross it. Duels love bridges!
+  const bridges = new Set();
+  const nb = H >= 11 ? 3 : 2;
+  for (let i = 0; i < nb; i++) bridges.add(Math.round(((i + 0.5) / nb) * (H - 1)) + rnd(3) - 1);
+  for (let y = 0; y < H; y++) {
+    if (bridges.has(y)) { T.set(half - 1, y, ''); T.dec(half - 1, y, 'bridge'); }
+    else T.set(half - 1, y, 'water');
+  }
+  // A lake, mountains and forests on each side.
+  const lx = 3 + rnd(Math.max(1, half - 6)), ly = 2 + rnd(Math.max(1, H - 5));
+  T.set(lx, ly, 'water'); if (Math.random() < 0.7) T.set(lx + 1, ly, 'water'); if (Math.random() < 0.5) T.set(lx, ly + 1, 'water');
+  for (let i = 0; i < Math.round(W * H / 40); i++) {
+    let x = 2 + rnd(half - 4), y = 1 + rnd(H - 2);
+    for (let k = 0; k < 1 + rnd(3); k++) { if (!T.kind[y]?.[x] && x > 1 && x < half - 2) T.set(x, y, 'mount'); x += rnd(3) - 1; y += rnd(3) - 1; if (y < 0 || y >= H) break; }
+  }
+  for (let i = 0; i < Math.round(W * H / 9); i++) { const x = 1 + rnd(half - 2), y = rnd(H); if (!T.kind[y][x]) T.dec(x, y, 'tree'); }
+  // Beaches next to the water.
+  for (let y = 0; y < H; y++) for (let x = 1; x < half - 1; x++) {
+    if (T.kind[y][x] || T.deco[y][x]) continue;
+    if ([[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => T.kind[y + dy]?.[x + dx] === 'water')) T.dec(x, y, 'sand');
+  }
+}
+
+// Can every open tile be reached from both bases? Unreachable pockets become blockers.
+function connect(T) {
+  const seen = grid(T.W, T.H, false), todo = [];
+  for (let y = 0; y < T.H; y++) { seen[y][0] = true; todo.push([0, y]); }
+  while (todo.length) {
+    const [x, y] = todo.pop();
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= T.W || ny >= T.H || seen[ny][nx] || T.rock[ny][nx]) continue;
+      seen[ny][nx] = true; todo.push([nx, ny]);
+    }
+  }
+  if (!seen.some(r => r[T.W - 1])) return false;
+  for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) if (!T.rock[y][x] && !seen[y][x]) {
+    T.rock[y][x] = true; T.kind[y][x] = T.map === 'country' ? 'water' : T.map === 'field' ? 'bush' : 'rock'; T.deco[y][x] = '';
+  }
+  return true;
+}
 
 function build(ctx) {
   const n = ctx.players().length;
   const size = ctx.S.terSize && ctx.S.terSize !== 'auto' ? ctx.S.terSize : n <= 10 ? 'small' : n <= 22 ? 'medium' : 'large';
   const [W, H] = { small: [16, 9], medium: [20, 11], large: [24, 13] }[size];
-  const T = { W, H, own: Array.from({ length: H }, () => Array(W).fill(0)), rock: Array.from({ length: H }, () => Array(W).fill(false)), duels: [], events: [] };
-  // Rocks, mirrored left/right so it's fair for both teams.
-  for (let i = 0; i < Math.round(W * H / 22); i++) {
-    const x = 3 + Math.floor(Math.random() * (W / 2 - 3)), y = Math.floor(Math.random() * H);
-    T.rock[y][x] = true; T.rock[y][W - 1 - x] = true;
+  let map = ctx.S.terMap || 'country';
+  if (!MAPS[map]) map = Object.keys(MAPS)[rnd(3)]; // "Surprise me"
+  for (let attempt = 0; ; attempt++) {
+    const T = { W, H, map: attempt < 30 ? map : 'arena', own: grid(W, H, 0), rock: grid(W, H, false), kind: grid(W, H, ''), deco: grid(W, H, ''), duels: [], events: [] };
+    T.set = (x, y, k) => { for (const xx of [x, W - 1 - x]) { T.kind[y][xx] = k; T.rock[y][xx] = !!k; if (k) T.deco[y][xx] = ''; } };
+    T.dec = (x, y, d) => { for (const xx of [x, W - 1 - x]) T.deco[y][xx] = d; };
+    ({ country: genCountry, field: genField, arena: genArena })[T.map](T);
+    // Bases: the first and last columns.
+    for (let y = 0; y < H; y++) for (const x of [0, W - 1]) { T.rock[y][x] = false; T.kind[y][x] = ''; T.deco[y][x] = ''; T.own[y][x] = x ? 2 : 1; }
+    if (connect(T)) { delete T.set; delete T.dec; return T; }
   }
-  // Bases: the first and last columns.
-  for (let y = 0; y < H; y++) { T.own[y][0] = 1; T.own[y][W - 1] = 2; T.rock[y][0] = T.rock[y][W - 1] = false; }
-  return T;
 }
 
 const isBase = (T, x) => x === 0 || x === T.W - 1;
@@ -51,23 +131,64 @@ function fitBoard(ctx) {
   board.style.width = w + 'px'; board.style.height = w / ratio + 'px';
 }
 
-function tileFill(T, x, y) {
+// Paint sits on top of the ground as a see-through layer, so the map still shows.
+function paintOf(T, x, y) {
   const o = T.own[y][x];
-  if (!o) return NEUTRAL[(x + y) % 2];
-  return isBase(T, x) ? TEAMS[o].dark : TEAMS[o].color;
+  if (!o) return { fill: '#000', op: 0 };
+  return { fill: isBase(T, x) ? TEAMS[o].dark : TEAMS[o].color, op: isBase(T, x) ? 0.92 : MAPS[T.map].paint };
+}
+
+const R = (x, y, w, h, c, extra = '') => `<rect x="${+x.toFixed(3)}" y="${+y.toFixed(3)}" width="${w}" height="${h}" fill="${c}"${extra}/>`;
+function blocker(k, x, y) {
+  switch (k) {
+    case 'water': return R(x, y, 1.02, 1.02, '#173a6b') + R(x + 0.1, y + 0.28, 0.34, 0.09, '#5fd3e8') + R(x + 0.18, y + 0.2, 0.18, 0.09, '#5fd3e8') + R(x + 0.55, y + 0.68, 0.34, 0.09, '#5fd3e8') + R(x + 0.63, y + 0.6, 0.18, 0.09, '#5fd3e8');
+    case 'mount': return R(x + 0.05, y + 0.62, 0.9, 0.36, '#6d6475') + R(x + 0.2, y + 0.38, 0.6, 0.26, '#857b8f') + R(x + 0.34, y + 0.14, 0.32, 0.26, '#9c93a6') + R(x + 0.38, y + 0.14, 0.24, 0.1, '#ffffff') + R(x + 0.05, y + 0.9, 0.9, 0.08, '#4d4655');
+    case 'hay': return R(x + 0.1, y + 0.28, 0.8, 0.62, '#e2b84a') + R(x + 0.1, y + 0.28, 0.8, 0.1, '#f5d77a') + R(x + 0.3, y + 0.28, 0.07, 0.62, '#b88a2a') + R(x + 0.63, y + 0.28, 0.07, 0.62, '#b88a2a') + R(x + 0.1, y + 0.84, 0.8, 0.06, '#8a6620');
+    case 'bush': return R(x + 0.12, y + 0.3, 0.76, 0.6, '#2e7d32') + R(x + 0.25, y + 0.15, 0.5, 0.3, '#388e3c') + R(x + 0.3, y + 0.22, 0.18, 0.12, '#66bb6a') + R(x + 0.12, y + 0.82, 0.76, 0.08, '#1b5e20');
+    default: return R(x, y, 1.02, 1.02, '#4a4560') + R(x + 0.15, y + 0.15, 0.7, 0.6, '#6b6585') + R(x + 0.15, y + 0.15, 0.7, 0.15, '#8d87a8');
+  }
+}
+function decoration(d, x, y) {
+  switch (d) {
+    case 'tree': return R(x + 0.45, y + 0.6, 0.12, 0.25, '#6b4226') + R(x + 0.28, y + 0.2, 0.46, 0.44, '#2f7d32') + R(x + 0.36, y + 0.1, 0.3, 0.14, '#3c9a40') + R(x + 0.34, y + 0.26, 0.12, 0.1, '#6cc26f');
+    case 'flower': return R(x + 0.3, y + 0.4, 0.1, 0.1, '#fff7c2') + R(x + 0.62, y + 0.66, 0.1, 0.1, '#ffd23f');
+    default: return '';
+  }
+}
+function groundOf(T, x, y) {
+  const g = MAPS[T.map].ground, d = T.deco[y][x];
+  if (d === 'bridge') return R(x, y, 1.02, 1.02, '#173a6b') + R(x, y + 0.1, 1.02, 0.8, '#a0703f') + R(x + 0.32, y + 0.1, 0.06, 0.8, '#7a5230') + R(x + 0.65, y + 0.1, 0.06, 0.8, '#7a5230');
+  if (d === 'sand') return R(x, y, 1.02, 1.02, (x + y) % 2 ? '#e0cf8a' : '#d8c47c');
+  if (T.map === 'field') return R(x, y, 1.02, 1.02, g[Math.floor(x / 2) % 2]); // mowing stripes
+  return R(x, y, 1.02, 1.02, g[(x + y) % 2]);
+}
+function fieldLines(T) {
+  if (T.map !== 'field') return '';
+  const { W, H } = T, c = 'stroke="#fff" stroke-opacity=".55" stroke-width=".09" fill="none"';
+  const box = Math.min(3, Math.floor(H / 3));
+  return `<g shape-rendering="geometricPrecision"><rect x="1.05" y=".05" width="${W - 2.1}" height="${H - 0.1}" ${c}/><line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${H}" ${c}/>
+    <circle cx="${W / 2}" cy="${H / 2}" r="${Math.min(2.2, H / 4)}" ${c}/><rect x="1" y="${(H - box * 2) / 2}" width="2.5" height="${box * 2}" ${c}/><rect x="${W - 3.5}" y="${(H - box * 2) / 2}" width="2.5" height="${box * 2}" ${c}/></g>`;
 }
 
 function drawBoard(ctx) {
   const { $, G, esc, heroEls, avatarSVG, players } = ctx, T = G.extra;
   const board = $('#mzBoard');
   fitBoard(ctx);
-  let rects = '';
+  let ground = '', paint = '', top = '';
   for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
-    if (T.rock[y][x]) rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="#4a4560"/><rect x="${x + 0.15}" y="${y + 0.15}" width="0.7" height="0.6" fill="#6b6585"/><rect x="${x + 0.15}" y="${y + 0.15}" width="0.7" height="0.15" fill="#8d87a8"/>`;
-    else rects += `<rect id="tt${x}_${y}" x="${x}" y="${y}" width="1.02" height="1.02" fill="${tileFill(T, x, y)}"/>`;
+    if (T.rock[y][x]) {
+      if (T.kind[y][x] !== 'water' && T.kind[y][x] !== 'rock') ground += groundOf(T, x, y);
+      top += blocker(T.kind[y][x], x, y);
+      continue;
+    }
+    ground += groundOf(T, x, y);
+    const pt = paintOf(T, x, y);
+    paint += `<rect id="tt${x}_${y}" x="${x}" y="${y}" width="1.02" height="1.02" fill="${pt.fill}" fill-opacity="${pt.op}"/>`;
+    top += decoration(T.deco[y][x], x, y);
   }
-  board.innerHTML = `<svg class="mz-walls" viewBox="0 0 ${T.W} ${T.H}" preserveAspectRatio="none" shape-rendering="crispEdges">${rects}</svg>` +
-    `<div class="ter-base" style="left:${pct(T, 0, -0.1).left};top:3%">🟥 BASE</div><div class="ter-base" style="left:${pct(T, T.W - 1, 0).left};top:3%">🟦 BASE</div>`;
+  const lbl = ['🟥 BASE', '🟦 BASE'];
+  board.innerHTML = `<svg class="mz-walls" viewBox="0 0 ${T.W} ${T.H}" preserveAspectRatio="none" shape-rendering="crispEdges">${ground}${paint}${fieldLines(T)}${top}</svg>` +
+    `<div class="ter-base" style="left:${pct(T, 0, -0.1).left};top:3%">${lbl[0]}</div><div class="ter-base" style="left:${pct(T, T.W - 1, 0).left};top:3%">${lbl[1]}</div>`;
   board.style.setProperty('--tile', (100 / T.W) + '%');
   heroEls.clear();
   for (const p of players()) {
@@ -84,7 +205,7 @@ function drawBoard(ctx) {
 
 function paintTile(T, x, y) {
   const el = document.getElementById(`tt${x}_${y}`);
-  if (el) el.setAttribute('fill', tileFill(T, x, y));
+  if (el) { const pt = paintOf(T, x, y); el.setAttribute('fill', pt.fill); el.setAttribute('fill-opacity', pt.op); }
 }
 
 function place(ctx, p) {
@@ -287,19 +408,22 @@ function botThink(ctx, p) {
 export default {
   id: 'territory',
   name: 'Territory Battle',
-  blurb: 'Two teams paint the arena with the arrows on their iPads! Run out of ink? Answer to refill. Bump into an enemy and you both get the same question: first right answer wins the duel. Most territory wins!',
+  blurb: 'Two teams paint the map with the arrows on their iPads! Run out of ink? Answer to refill. Bump into an enemy and you both get the same question: first right answer wins the duel. Most territory wins!',
   scoreName: 'Points',
   scoreShort: 'pts',
   selfPaced: true,
 
   settings(ctx, el, persist) {
     const { S } = ctx;
-    S.terMins = S.terMins || 5; S.terSize = S.terSize || 'auto';
+    S.terMins = S.terMins || 5; S.terSize = S.terSize || 'auto'; S.terMap = S.terMap || 'country';
     el.innerHTML = `<label>Time limit <select id="terMins">${[3, 4, 5, 6, 8, 10].map(m => `<option value="${m}">${m} min</option>`).join('')}</select></label>
+      <label>Battlefield <select id="terMap">${Object.entries(MAPS).map(([k, m]) => `<option value="${k}">${m.name}</option>`).join('')}<option value="random">Surprise me</option></select></label>
       <label>Arena size <select id="terSize"><option value="auto">Auto (by players)</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
       <p class="muted" style="margin:-6px 0 0;font-size:.8rem">Teams are split evenly when the game starts.</p>`;
     const mn = el.querySelector('#terMins'), sz = el.querySelector('#terSize');
-    mn.value = S.terMins; sz.value = S.terSize;
+    const mp = el.querySelector('#terMap');
+    mn.value = S.terMins; sz.value = S.terSize; mp.value = S.terMap;
+    mp.onchange = () => { S.terMap = mp.value; persist(); };
     mn.onchange = () => { S.terMins = +mn.value; persist(); };
     sz.onchange = () => { S.terSize = sz.value; persist(); };
   },
