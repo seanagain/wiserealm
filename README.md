@@ -40,8 +40,15 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 
 - On the teacher page, **📊 Classes & progress → Create class** (e.g. "Grade 8 · Period 2"). Each class
   gets a 6-letter code. Click **Show join code** to put it on the projector.
-- Students join from **wiserealm.org/me.html** (their profile page) by typing the code, or automatically:
-  pick the class in the game lobby's **Class** menu and everyone who plays signed in is added.
+- Students join in one of three ways (no typing needed for the first two):
+  1. **Invite link / QR:** click **Show join code** and share the link (e.g. in Google Classroom).
+     Students open it, sign in, and are added automatically.
+  2. **Play a game:** pick the class in the game lobby's **Class** menu. Everyone who signs in and
+     joins that game is added straight away.
+  3. Type the 6-letter code on **wiserealm.org/me.html** (their profile page).
+- **Real names:** the class page shows each student's real name from their school Google account
+  (only you see it), with their in-game name underneath. Students can still change their
+  in-game name; you can rename it too.
 - After every game (when you're signed in), each signed-in student's score, accuracy and missed
   questions are saved to the class.
 - Open a class to see: every student's accuracy, a trend chart of their last 10 games, coins,
@@ -207,7 +214,36 @@ coins and items. Nothing else. No passwords are ever seen by WiseRealm.
   different **Game** or **Question set** in the lobby; the room code and everyone who joined stay.
   **Play again** restarts the same game right away.
 - **Auto-next** can be turned on/off during a game with the **⏩ Auto-next** button.
+- **Lobby playground:** while waiting, students walk their heroes around a pixel classroom on the
+  projector with the arrow pad on their iPad, and send emotes. Click a hero to remove them.
+- **Require sign-in** (lobby setting): guests are turned away with a **Sign in** button that brings
+  them back into the game.
+- **🔓 Room open / 🔒 Room locked** (above the playground): lock the room once everyone is in, so
+  nobody else can join with the code. Students already in can still rejoin after a reload.
 - Guests can tap **Sign in to earn coins** on their waiting screen; they come straight back into the game.
+
+## Student privacy
+
+WiseRealm is built so students' information stays between the student and their own teachers.
+Families can read the plain-language version at **wiserealm.org/privacy.html** (top section, "For families").
+
+- **What's stored** (signed-in students only): school email, real name from Google, in-game name,
+  hero, coins, items, classes, game results and practice progress. Guests: nothing is saved.
+- **Teachers only see their own students:** students in their classes or who played their games.
+  A colleague you add can't see your students, and you can't see theirs.
+- **Other students** only see heroes and in-game names. Real names and emails never appear on the
+  projector or on other iPads.
+- **No account IDs over the live game connection.** The game code is public, so iPads only send a
+  random ticket; the projector looks it up in the database with your teacher login.
+- **No outside services** beyond Supabase (database), Google (sign-in) and GitHub Pages (hosting).
+  The Supabase library, the QR code library and the fonts are stored on the site itself.
+- **Deleting data:** students can delete their own account (Profile → My privacy). You can delete a
+  student's data from their page in your class (🗑 Delete data), for example when a family asks.
+  If the student is only in your classes, the whole account is deleted; if another teacher also
+  has them, only your records are removed. (You can also delete any account in Supabase:
+  Authentication → Users → ⋯ → Delete user. Everything linked to it is removed too.)
+- **Before using it with a class**, check your school or district's rules for classroom apps.
+  Many districts ask teachers to get new websites approved, especially for students under 13.
 
 ## Boss Raid details
 
@@ -250,6 +286,7 @@ js/modes/raid.js       Boss Raid
 js/modes/corners.js    Four Corners Dash
 js/modes/treasure.js   Treasure Hunt
 js/modes/maze.js       Mr. C's Maze
+js/lobby.js            lobby classroom playground
 js/play.js             student iPad screens
 js/shop.js             the shop
 js/me.js               student profile page
@@ -260,7 +297,9 @@ js/solo/*.js           the four single-player study games
 js/items.js            shop items (pixel art + prices)
 js/avatar.js           hero art     js/boss.js  boss art     js/sound.js  chiptune sounds
 js/sets.js             question sets     js/teacher.js  teacher page
-supabase/schema.sql    database tables and rules
+supabase/schema.sql    database tables and rules (incl. privacy limits)
+vendor/                Supabase + QR code libraries, stored here instead of a CDN
+privacy.html           privacy policy with a "For families" section
 tools/gen-shop-sql.mjs copies item prices from js/items.js into schema.sql
 ```
 

@@ -4,7 +4,8 @@ import { $, $$, esc, show, load, save, fmt, CHOICE_STYLE } from './common.js';
 import { getSet, getSets, buildQuestions, cleanItems } from './sets.js';
 import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
-import { avatarSVG, normalizeAvatar, avatarColor, randomAvatar } from './avatar.js';
+import { avatarSVG, normalizeAvatar, restrictAvatar, avatarColor, randomAvatar } from './avatar.js';
+import { createPlayground } from './lobby.js';
 import { sfx, isMuted, setMuted } from './sound.js';
 import { playEmote, bubbleHTML } from './emotes.js';
 import { ITEM_BY_ID, isFree } from './items.js';
@@ -18,7 +19,7 @@ const params = new URLSearchParams(location.search);
 // The game and question set can be switched in the lobby (same room code, same students).
 let set = getSet(params.get('set'));
 let mode = MODES[params.get('game')] || raid;
-const S = Object.assign({ time: 20, count: 0, auto: false, flip: false, emotes: true, coinMult: 1 }, load('cq_host_settings', {}));
+const S = Object.assign({ time: 20, count: 0, auto: false, flip: false, emotes: true, coinMult: 1, signin: false }, load('cq_host_settings', {}));
 const code = String(10000 + Math.floor(Math.random() * 90000));
 const joinBase = new URL('./', location.href).href;
 
@@ -26,7 +27,7 @@ const G = {
   phase: 'lobby', players: new Map(), kicked: new Set(),
   qs: [], qi: -1, answers: new Map(), qStart: 0, limit: 0,
   timers: [], tick: null, flow: 0, round: 0,
-  reveal: null, end: null, coins: null, teacher: false, extra: {},
+  reveal: null, end: null, coins: null, teacher: false, extra: {}, locked: false,
 };
 let net = null;
 const heroEls = new Map();
@@ -126,6 +127,7 @@ function onMsg(m) {
   else if (m.t === 'ans') handleAns(m);
   else if (m.t === 'sync') resync();
   else if (m.t === 'emote') handleEmote(m);
+  else if (m.t === 'dir' && G.phase === 'lobby') { const p = G.players.get(m.id); if (p) playground.setDir(p, m.d); }
   else if (mode.onMessage) mode.onMessage(ctx, m);
 }
 
@@ -139,31 +141,69 @@ function resync() {
   broadcast();
 }
 
-function handleJoin(m) {
+// ---- Which signed-in student is on which iPad ----
+// Privacy: iPads never send account IDs over the game connection (anyone with the room code
+// could read those). Each signed-in iPad registers a random ticket for this game in the
+// database, sends only the ticket, and the projector looks it up with the teacher's login.
+const roster = new Map(), ticketOwner = new Map();
+let pending = [], batchTimer = null, fetching = false;
+function lookupTicket(tk) {
+  if (roster.has(tk)) return Promise.resolve(roster.get(tk));
+  if (!G.teacher) return Promise.resolve(null);
+  return new Promise(res => { pending.push({ tk, res }); scheduleRoster(); });
+}
+function scheduleRoster() { if (!batchTimer && !fetching) batchTimer = setTimeout(fetchRoster, 250); }
+async function fetchRoster() {
+  batchTimer = null; fetching = true;
+  const batch = pending; pending = [];
+  try { for (const r of (await accounts.gameRoster(code)) || []) roster.set(r.device, r); } catch (e) { console.warn(e); }
+  fetching = false;
+  for (const b of batch) b.res(roster.get(b.tk) || null);
+  if (pending.length) scheduleRoster();
+}
+
+const joining = new Set();
+async function handleJoin(m) {
   const id = String(m.id || '').slice(0, 40);
-  if (!id) return;
+  if (!id || joining.has(id)) return;
   if (G.kicked.has(id)) return send({ t: 'joined', to: id, ok: false, reason: 'kicked' });
-  const name = String(m.name || '').replace(/\s+/g, ' ').trim().slice(0, 16);
+  const tk = typeof m.tk === 'string' && /^[\w-]{8,64}$/.test(m.tk) ? m.tk : null;
+  let acct = null;
+  if (tk) { joining.add(id); try { acct = await lookupTicket(tk); } finally { joining.delete(id); } }
+  // A ticket only works for the iPad that used it first.
+  if (acct) {
+    const owner = ticketOwner.get(tk);
+    if (owner && owner !== id && G.players.has(owner)) acct = null; else ticketOwner.set(tk, id);
+  }
+  const uid = acct ? acct.user_id : null;
+  const existing = G.players.get(id) || (uid && playerList().find(p => p.uid === uid));
+  if (G.locked && !existing) return send({ t: 'joined', to: id, ok: false, reason: 'locked' });
+  if (S.signin && G.teacher && !uid) return send({ t: 'joined', to: id, ok: false, reason: 'signin' });
+  const name = String((acct && acct.display_name) || m.name || '').replace(/\s+/g, ' ').trim().slice(0, 16);
   if (!name) return send({ t: 'joined', to: id, ok: false, reason: 'Please type a name.' });
-  const uid = typeof m.uid === 'string' ? m.uid.slice(0, 40) : null;
-  const taken = n => playerList().some(p => p.id !== id && p.name.toLowerCase() === n.toLowerCase());
+  const signedIn = !!(uid || m.acct);
+  const taken = n => playerList().some(p => p.id !== id && p.uid !== (uid || '-') && p.name.toLowerCase() === n.toLowerCase());
   let finalName = name;
   if (taken(name)) {
     // Signed-in students can't pick their name here, so give them a number (e.g. two "Maya L.").
-    if (!uid) return send({ t: 'joined', to: id, ok: false, reason: `Someone is already using “${name}”. Try a different name!` });
+    if (!signedIn) return send({ t: 'joined', to: id, ok: false, reason: `Someone is already using “${name}”. Try a different name!` });
     for (let n = 2; taken(finalName); n++) finalName = name.slice(0, 13) + ' ' + n;
   }
-  // One account can only play once per game (it can still rejoin from a new tab).
-  if (uid) for (const p of G.players.values()) if (p.uid === uid && p.id !== id) G.players.delete(p.id);
+  const av = acct ? normalizeAvatar(restrictAvatar(acct.avatar || {}, acct.owned || [])) : normalizeAvatar(m.av);
+  // One account can only play once per game (it can still rejoin from a new tab, keeping its score).
   let p = G.players.get(id);
+  if (!p && existing && existing.id !== id) {
+    G.players.delete(existing.id);
+    if (G.phase === 'lobby') { p = existing; p.id = id; G.players.set(id, p); }
+  }
   if (!p) {
-    p = { id, uid, name: finalName, av: normalizeAvatar(m.av), score: 0, correct: 0, streak: 0, m: {} };
+    p = { id, uid, name: finalName, av, score: 0, correct: 0, streak: 0, m: {} };
     G.players.set(id, p);
     if (G.phase !== 'lobby' && mode.addPlayer) mode.addPlayer(ctx, p);
     sfx('join');
-  } else { p.name = finalName; p.av = normalizeAvatar(m.av); p.uid = uid || p.uid; }
-  send({ t: 'joined', to: id, ok: true, name: finalName, coinsOn: G.teacher, state: stateMsg() });
-  if (uid && G.teacher && !p.owned) loadOwned(p);
+  } else { p.name = finalName; p.av = av; p.uid = uid || p.uid; }
+  if (acct) p.owned = acct.owned || [];
+  send({ t: 'joined', to: id, ok: true, name: finalName, coinsOn: G.teacher && !!p.uid, state: stateMsg() });
   renderRoster();
   if (G.phase !== 'lobby' && mode.renderPlayers) mode.renderPlayers(ctx);
   if (G.phase !== 'lobby' && mode.rejoin) mode.rejoin(ctx, p);
@@ -188,11 +228,7 @@ function handleAns(m) {
 }
 
 // ---------------- Emotes ----------------
-// Students can only use free emotes and ones they really own (checked against the database).
-async function loadOwned(p) {
-  p.owned = [];
-  try { const rows = await accounts.playersOwned([p.uid]); p.owned = (rows[0] && rows[0].owned) || []; } catch (e) { console.warn(e); }
-}
+// Students can only use free emotes and ones they really own (p.owned comes from game_roster).
 const EMOTE_PHASES = ['lobby', 'intro', 'reveal', 'dug', 'end'];
 const recentEmotes = [];
 function handleEmote(m) {
@@ -232,10 +268,21 @@ function refreshEmoteToggle() { $('#emoteToggle').textContent = S.emotes === fal
 function fail(msg) { $('#errMsg').textContent = msg; show('errScreen'); }
 
 // ---------------- Lobby ----------------
+const playground = createPlayground($('#roster'), { players: playerList, heroHTML });
 function renderRoster() {
-  const list = playerList();
-  $('#playerCount').textContent = list.length;
-  $('#roster').innerHTML = list.map(p => `<div class="hero" data-id="${esc(p.id)}" title="Click to remove">${heroHTML(p)}</div>`).join('');
+  $('#playerCount').textContent = playerList().length;
+  playground.sync();
+}
+function refreshLock() {
+  $('#lockBtn').textContent = G.locked ? '🔒 Room locked' : '🔓 Room open';
+  $('#lockBtn').classList.toggle('danger', G.locked);
+}
+$('#lockBtn').onclick = () => { G.locked = !G.locked; refreshLock(); };
+function refreshSigninHint() {
+  $('#setSignin').checked = !!S.signin;
+  $('#signinHint').textContent = !S.signin ? 'Guests can join with any name.'
+    : G.teacher ? 'Only signed-in students can join. Guests see a “Sign in” button.'
+    : 'Sign in as the teacher (below) to use this.';
 }
 
 $('#roster').addEventListener('click', e => {
@@ -289,6 +336,8 @@ function setupLobby() {
   $('#setCoins').value = String(S.coinMult ?? 1);
   $('#coinHint').textContent = coinHint();
   $('#setCoins').addEventListener('change', () => { S.coinMult = Number($('#setCoins').value); save('cq_host_settings', S); $('#coinHint').textContent = coinHint(); });
+  $('#setSignin').addEventListener('change', () => { S.signin = $('#setSignin').checked; save('cq_host_settings', S); refreshSigninHint(); });
+  refreshSigninHint(); refreshLock();
   $('#setEmotes').addEventListener('change', () => { S.emotes = $('#setEmotes').checked; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); });
   $('#emoteToggle').onclick = () => { S.emotes = S.emotes === false; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); };
   refreshEmoteToggle();
@@ -303,7 +352,7 @@ function setupLobby() {
 
 function loadQR(url) {
   const s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+  s.src = 'vendor/qrcode.js'; // stored on this site (no outside CDN)
   s.onload = () => {
     try {
       const qr = window.qrcode(0, 'M');
@@ -332,7 +381,10 @@ async function setupTeacher() {
     }
     await accounts.createGame(code, mode.id);
     G.teacher = true;
-    for (const p of G.players.values()) if (p.uid && !p.owned) loadOwned(p);
+    roster.clear();
+    refreshSigninHint();
+    // Students who joined before the teacher signed in: ask their iPads to register again.
+    send({ t: 'reg' });
     const classes = (await accounts.teacherClasses().catch(() => [])).filter(c => !c.archived);
     if (!classes.some(c => c.id === S.classId)) S.classId = '';
     box.innerHTML = `<b style="color:var(--good)">Coins &amp; progress: on</b><br><span class="muted">Signed-in students earn coins and their results are saved.${accounts.mode === 'demo' ? ' (Preview mode)' : ''}</span>
@@ -341,11 +393,12 @@ async function setupTeacher() {
     const pick = $('#classPick');
     const hint = () => {
       const c = classes.find(x => x.id === S.classId);
-      $('#classHint').textContent = c ? `Results go to ${c.name}. Players are added to the class automatically.` : classes.length ? 'Pick a class to track progress.' : 'Create classes on the teacher page (Classes & progress).';
+      $('#classHint').textContent = c ? `Results go to ${c.name}. Students who sign in and join are added to this class automatically (no class code needed).` : classes.length ? 'Pick a class to track progress.' : 'Create classes on the teacher page (Classes & progress).';
     };
     pick.value = S.classId || '';
-    pick.onchange = () => { S.classId = pick.value; save('cq_host_settings', S); hint(); };
-    hint();
+    const linkClass = () => accounts.setGameClass(code, S.classId || null).catch(e => console.warn(e));
+    pick.onchange = () => { S.classId = pick.value; save('cq_host_settings', S); hint(); linkClass(); };
+    hint(); linkClass();
   } catch (e) {
     console.warn(e);
     box.innerHTML = `<b>Coins: off</b><br><span class="muted">${esc(e.message)}</span>`;

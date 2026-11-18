@@ -32,7 +32,7 @@
   <div id="previewBanner" class="banner" hidden>🧪 Preview mode: Google sign-in isn’t set up on this device, so this is a pretend account.</div>
   <div id="gate" class="card panel" hidden>
     <h2 style="margin-top:0">Sign in to see your profile</h2>
-    <p class="muted">Use your school Google account to save your hero, coins and progress.</p>
+    <p class="muted" id="gateMsg">Use your school Google account to save your hero, coins and progress.</p>
     <button class="btn primary big" id="signIn">Sign in with Google</button>
     <p id="gateErr" style="color:var(--bad)"></p>
   </div>
@@ -74,6 +74,15 @@
     <div class="card panel">
       <h3>Recent games</h3>
       <div class="table-wrap" id="games"></div>
+    </div>
+    <div class="card panel">
+      <h3>My privacy</h3>
+      <ul style="margin:0 0 10px;padding-left:20px;line-height:1.6">
+        <li>Other students only see your hero and your in-game name, <b id="nameAgain"></b>. You can change it any time (✏️ Change name, above).</li>
+        <li>Only <b>your own teachers</b> see your real name (<span id="realName"></span>), your email and your results, so they can keep track of your progress.</li>
+        <li>No ads, no tracking, and nothing is sold or shared. <a href="privacy.html">Read the privacy policy</a>.</li>
+      </ul>
+      <button class="btn small danger" id="deleteMe">🗑 Delete my account and data</button>
     </div>
   </div>
 </section>

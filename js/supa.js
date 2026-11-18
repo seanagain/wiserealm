@@ -10,12 +10,22 @@ import { PREMIUM_SLOTS } from './avatar.js';
 
 export const isOnline = () => !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
-const CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm';
+// Supabase's library is stored on this site (vendor/), not loaded from a public CDN,
+// so no outside company sees who visits WiseRealm.
+const LIB = new URL('../vendor/supabase.js', import.meta.url).href;
+function loadLib() {
+  if (window.supabase && window.supabase.createClient) return Promise.resolve(window.supabase);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = LIB; s.onload = () => res(window.supabase); s.onerror = () => rej(new Error('Could not load. Check your internet.'));
+    document.head.append(s);
+  });
+}
 
 let clientP = null;
 export function getClient() {
   if (!isOnline()) return Promise.resolve(null);
-  clientP = clientP || import(CDN).then(({ createClient }) => createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+  clientP = clientP || loadLib().then(({ createClient }) => createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
     auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     realtime: { params: { eventsPerSecond: 30 } },
   }));
@@ -69,7 +79,11 @@ const online = {
   setAvatar(avatar) { return this.rpc('set_avatar', { p_avatar: avatar }); },
   isTeacher() { return this.rpc('am_i_teacher'); },
   createGame(code, mode) { return this.rpc('create_game', { p_code: code, p_mode: mode }); },
-  joinGame(code) { return this.rpc('join_game', { p_code: code }); },
+  joinGame(code, ticket) { return this.rpc('join_game', { p_code: code, p_device: ticket }); },
+  gameRoster(code) { return this.rpc('game_roster', { p_code: code }); },
+  setGameClass(code, cls) { return this.rpc('set_game_class', { p_code: code, p_class: cls || null }); },
+  deleteMyData() { return this.rpc('delete_my_data'); },
+  deleteStudentData(user) { return this.rpc('delete_student_data', { p_user: user }); },
   awardCoins(code, round, awards) { return this.rpc('award_coins', { p_code: code, p_round: round, p_awards: awards }); },
   students() { return this.rpc('list_students'); },
   giveCoins(user, amount, reason) { return this.rpc('give_coins', { p_user: user, p_amount: amount, p_reason: reason }); },
@@ -112,7 +126,9 @@ const online = {
 
 // ---------------- Preview (this device only) ----------------
 const DEMO_KEY = 'wr_demo_profile', DEMO_SIGNED = 'wr_demo_signed_in';
-const demoProfile = () => load(DEMO_KEY, null) || { id: 'demo-user', display_name: 'Demo Hero', email: 'preview@wiserealm', avatar: {}, coins: 500, owned: [] };
+const demoProfile = () => Object.assign({ id: 'demo-user', display_name: 'Demo Hero', real_name: 'Preview Student', email: 'preview@wiserealm', avatar: {}, coins: 500, owned: [] }, load(DEMO_KEY, {}) || {});
+// Preview "game_players": which iPad tickets joined which game, and the class picked for each game.
+const demoGames = () => load('wr_demo_games', {});
 const demo = {
   mode: 'demo',
   async user() { return load(DEMO_SIGNED, false) ? { id: 'demo-user', email: 'preview@wiserealm' } : null; },
@@ -134,13 +150,36 @@ const demo = {
   },
   async isTeacher() { return true; },
   async createGame() { return true; },
-  async joinGame() { return true; },
+  async joinGame(code, ticket) {
+    const g = demoGames(); const e = g[code] = g[code] || { tickets: [], cls: null };
+    if (!e.tickets.includes(ticket)) e.tickets.push(ticket);
+    save('wr_demo_games', g);
+    let cls = null;
+    if (e.cls) { try { cls = await this.joinClassById(e.cls); } catch { /* ignore */ } }
+    return { ok: true, class: cls };
+  },
+  async gameRoster(code) {
+    const e = demoGames()[code]; if (!e || !load(DEMO_SIGNED, false)) return [];
+    const p = demoProfile();
+    return e.tickets.map(t => ({ device: t, user_id: p.id, display_name: p.display_name, real_name: p.real_name, avatar: p.avatar, owned: p.owned }));
+  },
+  async setGameClass(code, cls) {
+    const g = demoGames(); const e = g[code] = g[code] || { tickets: [], cls: null };
+    e.cls = cls || null; save('wr_demo_games', g);
+    if (cls && e.tickets.length) await this.joinClassById(cls).catch(() => {});
+    return true;
+  },
+  async deleteMyData() {
+    for (const k of [DEMO_KEY, 'wr_demo_db', 'wr_demo_games']) localStorage.removeItem(k);
+    save(DEMO_SIGNED, false); return true;
+  },
+  async deleteStudentData() { return this.deleteMyData().then(() => 'deleted'); },
   async awardCoins(_code, _round, awards) {
     const p = demoProfile();
     if (awards[p.id]) { p.coins += Math.min(300, Math.max(0, awards[p.id] | 0)); save(DEMO_KEY, p); }
     return Object.keys(awards).length;
   },
-  async students() { const p = demoProfile(); return [{ id: p.id, display_name: p.display_name, email: p.email, coins: p.coins, items: p.owned.length }]; },
+  async students() { const p = demoProfile(); return [{ id: p.id, display_name: p.display_name, real_name: p.real_name, email: p.email, coins: p.coins, items: p.owned.length }]; },
   async giveCoins(_u, amount) { const p = demoProfile(); p.coins = Math.max(0, p.coins + (amount | 0)); save(DEMO_KEY, p); return p.coins; },
   ...demoClasses(),
   // Preview "cloud": a second store on this device, so syncing can be tried out.
@@ -197,7 +236,7 @@ function demoPractice() {
       const sets = d.class_sets.filter(x => x.class_id === cls).map(x => cloudSet(x.set_id)).filter(Boolean);
       return d.members.filter(m => m.class_id === cls).map(() => {
         const ss = d.psessions.filter(s => sets.some(x => x.id === s.set_id));
-        return { user_id: p.id, display_name: p.display_name, sessions: ss.length, minutes: Math.floor(ss.reduce((a, s) => a + s.duration_s, 0) / 60),
+        return { user_id: p.id, display_name: p.display_name, real_name: p.real_name, sessions: ss.length, minutes: Math.floor(ss.reduce((a, s) => a + s.duration_s, 0) / 60),
           last_practiced: d.psessions.length ? d.psessions[d.psessions.length - 1].played_at : null,
           mastered: d.cards.filter(c => c.box >= 3 && sets.some(x => x.id === c.set_id)).length, total_cards: sets.reduce((a, x) => a + x.items.length, 0), streak: streak(d) };
       });
@@ -260,6 +299,11 @@ function demoClasses() {
       if (!d.members.some(m => m.class_id === c.id && m.user_id === 'demo-user')) d.members.push({ class_id: c.id, user_id: 'demo-user' });
       put(d); return c.name;
     },
+    async joinClassById(id) {
+      const d = db(); const c = d.classes.find(x => x.id === id && !x.archived); if (!c) return null;
+      if (!d.members.some(m => m.class_id === c.id && m.user_id === 'demo-user')) d.members.push({ class_id: c.id, user_id: 'demo-user' });
+      put(d); return c.name;
+    },
     async leaveClass(id) { const d = db(); d.members = d.members.filter(m => !(m.class_id === id && m.user_id === 'demo-user')); put(d); return true; },
     async myStats() {
       const d = db(), p = demoProfile();
@@ -284,7 +328,7 @@ function demoClasses() {
       return d.members.filter(m => m.class_id === id).map(m => {
         const rs = classResults(d, id).filter(r => r.user_id === m.user_id);
         const games = rs.map(r => gameRow(d, r)).sort((a, b) => a.played_at.localeCompare(b.played_at));
-        return { user_id: m.user_id, display_name: p.display_name, email: p.email, coins: p.coins, games: rs.length,
+        return { user_id: m.user_id, display_name: p.display_name, real_name: p.real_name, email: p.email, coins: p.coins, games: rs.length,
           correct: rs.reduce((a, r) => a + r.correct, 0), total: rs.reduce((a, r) => a + r.total, 0),
           accuracy: pct(rs.reduce((a, r) => a + r.correct, 0), rs.reduce((a, r) => a + r.total, 0)),
           last_played: games.length ? games[games.length - 1].played_at : null, recent: games.slice(-10).map(g => Math.round((100 * g.correct) / (g.total || 1))) };
@@ -298,7 +342,7 @@ function demoClasses() {
     },
     async sessionDetail(id) {
       const d = db(), p = demoProfile(); const s = d.sessions.find(x => x.id === id); if (!s) throw new Error('Not your game');
-      return { ...s, results: d.results.filter(r => r.session_id === id).map(r => ({ ...r, name: p.display_name })) };
+      return { ...s, results: d.results.filter(r => r.session_id === id).map(r => ({ ...r, name: p.display_name, real_name: p.real_name })) };
     },
     async hardQuestions(id) {
       const d = db(); mine(d, id); const agg = new Map();
@@ -312,7 +356,7 @@ function demoClasses() {
       const rs = classResults(d, cls).filter(r => r.user_id === user);
       const missed = new Map();
       for (const r of rs) { const s = d.sessions.find(x => x.id === r.session_id); for (const i of r.missed) { const q = s.questions[i]; if (!q) continue; const m = missed.get(q.p) || { prompt: q.p, answer: q.a, times: 0 }; m.times++; missed.set(q.p, m); } }
-      return { profile: { id: p.id, name: p.display_name, email: p.email, coins: p.coins }, games: rs.map(r => gameRow(d, r)).sort((a, b) => a.played_at.localeCompare(b.played_at)),
+      return { profile: { id: p.id, name: p.display_name, real_name: p.real_name, email: p.email, coins: p.coins }, games: rs.map(r => gameRow(d, r)).sort((a, b) => a.played_at.localeCompare(b.played_at)),
         missed: [...missed.values()].sort((a, b) => b.times - a.times) };
     },
   };

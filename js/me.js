@@ -4,7 +4,7 @@ import { accounts } from './supa.js';
 import { avatarSVG, restrictAvatar } from './avatar.js';
 import { barChart, enableTips } from './charts.js';
 
-const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt' };
+const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt', maze: 'Mr. C’s Maze' };
 const day = d => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const acc = g => (g.total ? Math.round((100 * g.correct) / g.total) : 0);
 
@@ -33,6 +33,8 @@ async function load() {
   const prof = await accounts.profile();
   const stats = await accounts.myStats();
   $('#name').textContent = prof.display_name;
+  $('#nameAgain').textContent = prof.display_name;
+  $('#realName').textContent = prof.real_name || 'your name from your school account';
   $('#hero').innerHTML = avatarSVG(restrictAvatar(prof.avatar, prof.owned || []));
   $('#coins').textContent = `🪙 ${fmt(prof.coins)}`;
 
@@ -75,7 +77,7 @@ $('#renameSave').onclick = async () => {
   const msg = $('#renameMsg');
   try {
     const prof = await accounts.setDisplayName($('#renameIn').value);
-    $('#name').textContent = prof.display_name;
+    $('#name').textContent = prof.display_name; $('#nameAgain').textContent = prof.display_name;
     $('#renameForm').hidden = true; $('#renameBtn').hidden = false;
     msg.style.color = 'var(--good)'; msg.textContent = 'Name saved!';
   } catch (e) { msg.style.color = 'var(--bad)'; msg.textContent = e.message; }
@@ -100,6 +102,16 @@ $('#classes').addEventListener('click', async e => {
   await accounts.leaveClass(b.dataset.leave); await load();
 });
 $('#signIn').onclick = () => accounts.signIn().catch(err => ($('#gateErr').textContent = err.message));
+$('#deleteMe').onclick = async () => {
+  const typed = prompt('Delete your WiseRealm account?\n\nThis deletes your hero, coins, items, game results and practice progress, and removes you from your classes. It can’t be undone.\n\nType DELETE to confirm.');
+  if ((typed || '').trim().toUpperCase() !== 'DELETE') return;
+  try {
+    await accounts.deleteMyData();
+    await accounts.signOut().catch(() => {});
+    alert('Your account and data were deleted.');
+    location.href = 'index.html';
+  } catch (e) { alert(e.message); }
+};
 $('#signOut').onclick = async () => { await accounts.signOut(); location.href = 'index.html'; };
 
 (async function init() {
@@ -107,10 +119,19 @@ $('#signOut').onclick = async () => { await accounts.signOut(); location.href = 
   enableTips();
   try {
     const user = await accounts.user();
-    if (!user) { $('#gate').hidden = false; return; }
-    $('#main').hidden = false; $('#signOut').hidden = false;
     const join = new URLSearchParams(location.search).get('class');
-    if (join) $('#classCode').value = join;
+    if (!user) {
+      $('#gate').hidden = false;
+      if (join) $('#gateMsg').textContent = 'Sign in with your school Google account to join your class.';
+      return;
+    }
+    $('#main').hidden = false; $('#signOut').hidden = false;
     await load();
+    if (join) {
+      // Opened the teacher's invite link: join the class right away.
+      history.replaceState(null, '', 'me.html');
+      $('#classCode').value = join;
+      await $('#joinClass').onclick();
+    }
   } catch (err) { $('#gate').hidden = false; $('#gateErr').textContent = err.message; }
 })();

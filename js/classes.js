@@ -4,7 +4,7 @@ import { accounts } from './supa.js';
 import { newSet, upsertSet, getSets, isSample } from './sets.js';
 import { barChart, sparkline, pctBar, enableTips } from './charts.js';
 
-const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt' };
+const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt', maze: 'Mr. C’s Maze' };
 const day = d => (d ? new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '-');
 const when = d => (d ? new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-');
 const joinUrl = () => new URL('me.html', location.href).href.replace(/^https?:\/\//, '');
@@ -38,12 +38,37 @@ async function renderGrid() {
     </div>`).join('') : '<p class="muted">No classes yet. Create one above, e.g. “Grade 8 · Period 2”.</p>';
 }
 
+// Invite link: students open it, sign in, and are added to the class automatically.
+const inviteUrl = c => new URL('me.html?class=' + encodeURIComponent(c.join_code), location.href).href;
 function showCode(c) {
+  const link = inviteUrl(c);
   $('#codeBody').innerHTML = `<h2 style="margin-top:0">${esc(c.name)}</h2>
-    <p style="font-size:1.2rem">Students: sign in at <b style="color:var(--gold)">${esc(joinUrl())}</b> and enter</p>
+    <div class="invite-row">
+      <div class="qr" id="inviteQr" hidden></div>
+      <div style="text-align:left">
+        <p style="font-size:1.15rem;margin-top:0"><b>Easiest:</b> students scan the code or open this link, then sign in. They’re added to the class automatically.</p>
+        <div class="flex"><input class="input" id="inviteLink" readonly value="${esc(link)}" style="flex:1;min-width:220px;font-size:.9rem">
+          <button class="btn small primary" id="copyInvite">Copy link</button></div>
+        <p class="muted" style="margin-bottom:0">Paste it into Google Classroom or your class page.</p>
+      </div>
+    </div>
+    <p style="font-size:1.05rem;margin-bottom:4px">Or: sign in at <b style="color:var(--gold)">${esc(joinUrl())}</b> and enter</p>
     <div class="big-code">${esc(c.join_code)}</div>
-    <p class="muted">Or join automatically by playing a game where this class is picked in the lobby.</p>`;
+    <p class="muted">Also automatic: pick this class in a game lobby, and everyone who plays signed in is added.</p>`;
+  $('#copyInvite').onclick = async () => {
+    try { await navigator.clipboard.writeText(link); $('#copyInvite').textContent = 'Copied!'; }
+    catch { $('#inviteLink').select(); }
+  };
+  makeQR(link, $('#inviteQr'));
   $('#codeDialog').showModal();
+}
+function makeQR(text, box) {
+  const draw = () => {
+    try { const qr = window.qrcode(0, 'M'); qr.addData(text); qr.make(); box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); box.hidden = false; }
+    catch { /* no QR, that's fine */ }
+  };
+  if (window.qrcode) return draw();
+  const s = document.createElement('script'); s.src = 'vendor/qrcode.js'; s.onload = draw; document.head.append(s);
 }
 
 async function openClass(id) {
@@ -111,7 +136,7 @@ function renderTab() {
     panel.innerHTML = overview.length ? `<div class="table-wrap"><table class="data-table"><thead><tr>
         <th>Student</th><th>Games</th><th>Accuracy</th><th>Last 10 games</th><th>Last played</th><th>Coins</th><th>Give coins</th><th></th></tr></thead><tbody>
       ${overview.map(r => `<tr data-id="${esc(r.user_id)}">
-        <td><button class="linkish" data-student="${esc(r.user_id)}">${esc(r.display_name)}</button><br><span class="muted" style="font-size:.8rem">${esc(r.email || '')}</span></td>
+        <td><button class="linkish" data-student="${esc(r.user_id)}">${esc(r.real_name || r.display_name)}</button><br><span class="muted" style="font-size:.8rem">${r.real_name ? 'In games: ' + esc(r.display_name) + ' · ' : ''}${esc(r.email || '')}</span></td>
         <td>${r.games}</td><td>${pctBar(r.accuracy)}</td><td>${sparkline(r.recent, 'Game')}</td><td>${day(r.last_played)}</td>
         <td><span class="coin-pill">🪙 ${fmt(r.coins)}</span></td>
         <td class="flex"><button class="btn small" data-give="10">+10</button><button class="btn small" data-give="50">+50</button></td>
@@ -132,7 +157,7 @@ function renderTab() {
       <div id="asgMsg" class="muted" style="min-height:1.2em;margin-top:6px"></div>
       <h3>Who’s practicing</h3>
       ${practice.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Sessions</th><th>Minutes</th><th>Mastered (★★★)</th><th>Streak</th><th>Last practiced</th></tr></thead><tbody>
-        ${practice.map(r => `<tr><td><b>${esc(r.display_name)}</b></td><td>${r.sessions}</td><td>${r.minutes}</td>
+        ${practice.map(r => `<tr><td><b>${esc(r.real_name || r.display_name)}</b>${r.real_name ? `<br><span class="muted" style="font-size:.8rem">In games: ${esc(r.display_name)}</span>` : ''}</td><td>${r.sessions}</td><td>${r.minutes}</td>
           <td>${r.total_cards ? pctBar((100 * r.mastered) / r.total_cards) + ` <span class="muted">${r.mastered}/${r.total_cards}</span>` : '<span class="muted">no sets assigned</span>'}</td>
           <td>${r.streak ? '🔥 ' + r.streak : '-'}</td><td>${day(r.last_practiced)}</td></tr>`).join('')}</tbody></table></div>`
         : '<p class="muted">No students in this class yet.</p>'}`;
@@ -175,8 +200,10 @@ async function openStudent(uid) {
   const avg = l => { const t = l.reduce((s, x) => s + x.total, 0); return t ? Math.round((100 * l.reduce((s, x) => s + x.correct, 0)) / t) : null; };
   const trend = g.length >= 4 ? avg(secondHalf) - avg(firstHalf) : null;
   $('#detailBody').innerHTML = `
-    <div class="flex"><h2 style="margin:0">${esc(d.profile.name)} <span class="muted" style="font-size:.7rem">${esc(d.profile.email || '')}</span></h2>
-      <span class="spacer"></span><button class="btn small" id="renameStudent" data-uid="${esc(uid)}" data-name="${esc(d.profile.name)}">✏️ Rename</button></div>
+    <div class="flex"><div><h2 style="margin:0">${esc(d.profile.real_name || d.profile.name)}</h2>
+        <span class="muted" style="font-size:.9rem">${d.profile.real_name ? 'In games: <b>' + esc(d.profile.name) + '</b> · ' : ''}${esc(d.profile.email || '')}</span></div>
+      <span class="spacer"></span><button class="btn small" id="renameStudent" data-uid="${esc(uid)}" data-name="${esc(d.profile.name)}">✏️ Rename (in-game name)</button>
+      <button class="btn small danger" id="deleteStudent" data-uid="${esc(uid)}" data-name="${esc(d.profile.real_name || d.profile.name)}">🗑 Delete data</button></div>
     <div class="tiles">
       <div class="card tile-stat"><div class="lbl">Games</div><div class="num">${g.length}</div></div>
       <div class="card tile-stat"><div class="lbl">Accuracy</div><div class="num">${totalQ ? Math.round((100 * totalC) / totalQ) + '%' : '-'}</div><div class="sub">${totalC} of ${totalQ} right</div></div>
@@ -207,7 +234,7 @@ async function openSession(id) {
     </tbody></table>
     <h3>Players</h3>
     <table class="data-table"><thead><tr><th>Place</th><th>Student</th><th>Correct</th><th>Score</th><th>Missed questions</th></tr></thead><tbody>
-      ${s.results.map(r => `<tr><td>${r.rank ? '#' + r.rank : '-'}</td><td>${esc(r.name)}</td><td>${r.correct}/${r.total}</td><td>${fmt(r.score)}</td>
+      ${s.results.map(r => `<tr><td>${r.rank ? '#' + r.rank : '-'}</td><td>${esc(r.real_name || r.name)}</td><td>${r.correct}/${r.total}</td><td>${fmt(r.score)}</td>
         <td class="muted">${(r.missed || []).map(i => '#' + (i + 1)).join(', ') || '-'}</td></tr>`).join('')}
     </tbody></table>`;
   $('#detail').showModal();
@@ -215,8 +242,8 @@ async function openSession(id) {
 
 function exportCsv(c, rows) {
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Student', 'Email', 'Games played', 'Correct', 'Questions answered', 'Accuracy %', 'Last played', 'Coins'].map(q).join(',')]
-    .concat(rows.map(r => [r.display_name, r.email, r.games, r.correct, r.total, r.accuracy ?? '', r.last_played ? new Date(r.last_played).toLocaleDateString() : '', r.coins].map(q).join(',')));
+  const lines = [['Student', 'In-game name', 'Email', 'Games played', 'Correct', 'Questions answered', 'Accuracy %', 'Last played', 'Coins'].map(q).join(',')]
+    .concat(rows.map(r => [r.real_name || r.display_name, r.display_name, r.email, r.games, r.correct, r.total, r.accuracy ?? '', r.last_played ? new Date(r.last_played).toLocaleDateString() : '', r.coins].map(q).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -255,6 +282,18 @@ $('#classView').addEventListener('click', async e => {
 });
 $('#detailClose').onclick = () => $('#detail').close();
 $('#detailBody').addEventListener('click', async e => {
+  const del = e.target.closest('#deleteStudent');
+  if (del) {
+    // For when a family asks for their child's data to be deleted.
+    const typed = prompt(`Delete ${del.dataset.name}'s WiseRealm data?\n\nIf they are only in your classes, their whole account is deleted (coins, items, results, practice). If another teacher also has them, only your classes' records are removed.\n\nThis can't be undone. Type DELETE to confirm.`);
+    if ((typed || '').trim().toUpperCase() !== 'DELETE') return;
+    try {
+      const r = await accounts.deleteStudentData(del.dataset.uid);
+      alert(r === 'deleted' ? 'Done. Their account and all its data were deleted.' : 'Done. Your records about this student were removed. (Another teacher also has them, so their account still exists.)');
+      $('#detail').close(); await renderClass();
+    } catch (err) { alert(err.message); }
+    return;
+  }
   const b = e.target.closest('#renameStudent'); if (!b) return;
   const name = prompt('New name for this student (2 to 16 characters)', b.dataset.name);
   if (!name) return;

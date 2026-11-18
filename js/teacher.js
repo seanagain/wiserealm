@@ -201,10 +201,10 @@ async function renderStudents() {
   const list = $('#studentList');
   const rows = await accounts.students();
   list.hidden = false;
-  if (!rows.length) { list.innerHTML = '<p class="muted">No students have signed in yet. They appear here after they sign in on the join page.</p>'; return; }
+  if (!rows.length) { list.innerHTML = '<p class="muted">No students yet. Students appear here after they join one of your classes or play one of your games while signed in.</p>'; return; }
   list.innerHTML = `<p class="muted" style="margin-top:0">Give bonus coins for great work or helping others (or take some away with a minus number).</p>
-    <div class="table-wrap"><table class="editor-table"><thead><tr><th>Name</th><th>Email</th><th>Coins</th><th>Items</th><th>Give coins</th></tr></thead><tbody>
-    ${rows.map(r => `<tr data-id="${esc(r.id)}"><td><b>${esc(r.display_name)}</b></td><td class="muted">${esc(r.email || '')}</td>
+    <div class="table-wrap"><table class="editor-table"><thead><tr><th>Student</th><th>In-game name</th><th>Email</th><th>Coins</th><th>Items</th><th>Give coins</th></tr></thead><tbody>
+    ${rows.map(r => `<tr data-id="${esc(r.id)}"><td><b>${esc(r.real_name || r.display_name)}</b></td><td>${esc(r.display_name)}</td><td class="muted">${esc(r.email || '')}</td>
       <td><span class="coin-pill">🪙 ${fmt(r.coins)}</span></td><td>${r.items}</td>
       <td class="flex"><button class="btn small" data-give="10">+10</button><button class="btn small" data-give="50">+50</button>
       <input style="width:80px" type="number" placeholder="±" class="giveAmt"><button class="btn small" data-give="custom">Give</button></td></tr>`).join('')}

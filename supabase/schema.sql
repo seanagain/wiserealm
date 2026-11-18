@@ -5,6 +5,9 @@
 -- Security model: students can READ their own profile, but every change (buying,
 -- equipping, earning coins) goes through the functions below, which check the rules.
 -- Only emails listed in `teachers` can start coin-earning games or give coins.
+--
+-- Privacy model: a teacher can only see students who are in one of THEIR classes or who
+-- joined one of THEIR games (teacher_sees). Students never see each other's emails or real names.
 
 -- ---------- Tables ----------
 create table if not exists public.teachers (
@@ -20,6 +23,9 @@ create table if not exists public.profiles (
   owned text[] not null default '{}',
   created_at timestamptz not null default now()
 );
+-- The student's real name from their school Google account. Only their own teachers see it;
+-- in games everyone sees display_name, which the student can change.
+alter table public.profiles add column if not exists real_name text;
 
 create table if not exists public.shop_items (
   id text primary key,
@@ -42,6 +48,10 @@ create table if not exists public.game_players (
   joined_at timestamptz not null default now(),
   primary key (code, user_id)
 );
+-- A random "ticket" made by the student's iPad for this game. The projector looks it up with
+-- game_roster(), so account IDs never travel over the live game connection.
+alter table public.game_players add column if not exists device text;
+create unique index if not exists game_players_device on public.game_players (code, device);
 
 create table if not exists public.coin_log (
   id bigserial primary key,
@@ -77,22 +87,27 @@ begin
   return left(parts[1] || ' ' || left(parts[n], 1) || '.', 16);
 end $$;
 
+create or replace function public.real_name_of(meta jsonb) returns text
+language sql immutable as $$
+  select nullif(left(trim(coalesce(meta ->> 'full_name', meta ->> 'name', '')), 80), '');
+$$;
+
 -- ---------- Row level security (read-only access; changes go through functions) ----------
 drop policy if exists "read own profile" on public.profiles;
-create policy "read own profile" on public.profiles for select using (id = auth.uid() or public.is_teacher());
+create policy "read own profile" on public.profiles for select using (id = auth.uid());
 
 drop policy if exists "anyone can read the shop" on public.shop_items;
 create policy "anyone can read the shop" on public.shop_items for select using (true);
 
 drop policy if exists "read own coin history" on public.coin_log;
-create policy "read own coin history" on public.coin_log for select using (user_id = auth.uid() or public.is_teacher());
+create policy "read own coin history" on public.coin_log for select using (user_id = auth.uid());
 
 -- ---------- New accounts get a profile automatically ----------
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, email, display_name)
-  values (new.id, new.email, public.make_display_name(new.raw_user_meta_data, new.email))
+  insert into public.profiles (id, email, display_name, real_name)
+  values (new.id, new.email, public.make_display_name(new.raw_user_meta_data, new.email), public.real_name_of(new.raw_user_meta_data))
   on conflict (id) do nothing;
   return new;
 end $$;
@@ -110,9 +125,12 @@ begin
   select * into prof from public.profiles where id = auth.uid();
   if not found then
     select * into u from auth.users where id = auth.uid();
-    insert into public.profiles (id, email, display_name)
-    values (u.id, u.email, public.make_display_name(u.raw_user_meta_data, u.email))
+    insert into public.profiles (id, email, display_name, real_name)
+    values (u.id, u.email, public.make_display_name(u.raw_user_meta_data, u.email), public.real_name_of(u.raw_user_meta_data))
     returning * into prof;
+  elsif prof.real_name is null then
+    select * into u from auth.users where id = auth.uid();
+    update public.profiles set real_name = public.real_name_of(u.raw_user_meta_data) where id = auth.uid() returning * into prof;
   end if;
   return prof;
 end $$;
@@ -156,16 +174,30 @@ begin
 end $$;
 
 -- A signed-in student joining a live game (so they can earn coins in it).
-create or replace function public.join_game(p_code text) returns boolean
+-- p_device is a random ticket from the student's iPad (see game_players.device).
+-- If the teacher picked a class for this game, the student is added to that class too.
+drop function if exists public.join_game(text);
+create or replace function public.join_game(p_code text, p_device text) returns jsonb
 language plpgsql security definer set search_path = public as $$
+declare g public.games; cname text;
 begin
-  if auth.uid() is null then return false; end if;
+  if auth.uid() is null then return jsonb_build_object('ok', false); end if;
+  if p_device is null or length(p_device) not between 8 and 64 then raise exception 'Invalid device'; end if;
   perform public.my_profile();
-  if not exists (select 1 from public.games where code = p_code and created_at > now() - interval '12 hours') then
-    return false;
+  select * into g from public.games where code = p_code and created_at > now() - interval '12 hours';
+  if not found then return jsonb_build_object('ok', false); end if;
+  if exists (select 1 from public.game_players where code = p_code and device = p_device and user_id <> auth.uid()) then
+    raise exception 'Invalid device';
   end if;
-  insert into public.game_players (code, user_id) values (p_code, auth.uid()) on conflict do nothing;
-  return true;
+  insert into public.game_players (code, user_id, device) values (p_code, auth.uid(), p_device)
+    on conflict (code, user_id) do update set device = excluded.device;
+  if g.class_id is not null then
+    select c.name into cname from public.classes c where c.id = g.class_id and not c.archived;
+    if cname is not null then
+      insert into public.class_members (class_id, user_id) values (g.class_id, auth.uid()) on conflict do nothing;
+    end if;
+  end if;
+  return jsonb_build_object('ok', true, 'class', cname);
 end $$;
 
 -- ---------- Teacher functions ----------
@@ -211,14 +243,17 @@ begin
   return paid;
 end $$;
 
+-- Only the students in my classes or my games (never every account on the site).
+drop function if exists public.list_students();
 create or replace function public.list_students()
-returns table (id uuid, display_name text, email text, coins integer, items integer, created_at timestamptz)
+returns table (id uuid, display_name text, real_name text, email text, coins integer, items integer, created_at timestamptz)
 language plpgsql stable security definer set search_path = public as $$
 begin
   if not public.is_teacher() then raise exception 'Not a teacher'; end if;
   return query
-    select p.id, p.display_name, p.email, p.coins, coalesce(array_length(p.owned, 1), 0), p.created_at
-    from public.profiles p order by p.display_name;
+    select p.id, p.display_name, p.real_name, p.email, p.coins, coalesce(array_length(p.owned, 1), 0), p.created_at
+    from public.profiles p where p.id <> auth.uid() and public.teacher_sees(p.id)
+    order by coalesce(p.real_name, p.display_name);
 end $$;
 
 -- Bonus (or penalty) coins from the teacher, up to 1000 at a time.
@@ -228,6 +263,7 @@ declare newc integer;
 begin
   if not public.is_teacher() then raise exception 'Not a teacher'; end if;
   if abs(p_amount) > 1000 then raise exception 'At most 1000 coins at a time'; end if;
+  if not public.teacher_sees(p_user) then raise exception 'That student isn''t in one of your classes or games'; end if;
   update public.profiles set coins = greatest(0, coins + p_amount) where id = p_user returning coins into newc;
   if not found then raise exception 'Student not found'; end if;
   insert into public.coin_log (user_id, amount, reason) values (p_user, p_amount, coalesce(nullif(p_reason, ''), 'From your teacher'));
@@ -235,10 +271,10 @@ begin
 end $$;
 
 -- Only signed-in users may call the functions above (they also check inside).
-revoke all on function public.my_profile(), public.buy_item(text), public.set_avatar(jsonb), public.join_game(text),
+revoke all on function public.my_profile(), public.buy_item(text), public.set_avatar(jsonb), public.join_game(text, text),
   public.create_game(text, text), public.award_coins(text, integer, jsonb), public.list_students(),
   public.give_coins(uuid, integer, text), public.am_i_teacher() from public, anon;
-grant execute on function public.my_profile(), public.buy_item(text), public.set_avatar(jsonb), public.join_game(text),
+grant execute on function public.my_profile(), public.buy_item(text), public.set_avatar(jsonb), public.join_game(text, text),
   public.create_game(text, text), public.award_coins(text, integer, jsonb), public.list_students(),
   public.give_coins(uuid, integer, text), public.am_i_teacher() to authenticated;
 
@@ -290,6 +326,28 @@ create table if not exists public.game_results (
 alter table public.game_results add column if not exists players integer; -- how many people played that game
 create index if not exists game_results_user on public.game_results (user_id);
 create index if not exists game_sessions_class on public.game_sessions (class_id, played_at);
+
+alter table public.games add column if not exists class_id uuid references public.classes (id) on delete set null;
+
+-- Can the signed-in teacher see this student? Only if the student is in one of their
+-- classes or joined one of their games.
+create or replace function public.teacher_sees(p_user uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_teacher() and (
+    exists (select 1 from public.class_members m join public.classes c on c.id = m.class_id
+            where m.user_id = p_user and c.teacher_id = auth.uid())
+    or exists (select 1 from public.game_players gp join public.games g on g.code = gp.code
+            where gp.user_id = p_user and g.teacher_id = auth.uid()));
+$$;
+
+drop policy if exists "read own profile" on public.profiles;
+create policy "read own profile" on public.profiles for select using (id = auth.uid() or public.teacher_sees(id));
+drop policy if exists "read own coin history" on public.coin_log;
+create policy "read own coin history" on public.coin_log for select using (user_id = auth.uid() or public.teacher_sees(user_id));
+
+-- Backfill real names for accounts made before real_name existed.
+update public.profiles p set real_name = public.real_name_of(u.raw_user_meta_data)
+  from auth.users u where u.id = p.id and p.real_name is null and public.real_name_of(u.raw_user_meta_data) is not null;
 
 alter table public.classes enable row level security;
 alter table public.class_members enable row level security;
@@ -431,14 +489,15 @@ begin
 end $$;
 
 -- ---------- Teacher: progress reports ----------
+drop function if exists public.class_overview(uuid);
 create or replace function public.class_overview(p_class uuid)
-returns table (user_id uuid, display_name text, email text, coins integer, games integer, correct integer, total integer,
+returns table (user_id uuid, display_name text, real_name text, email text, coins integer, games integer, correct integer, total integer,
                accuracy numeric, last_played timestamptz, recent jsonb)
 language plpgsql stable security definer set search_path = public as $$
 begin
   if not public.owns_class(p_class) then raise exception 'Not your class'; end if;
   return query
-    select p.id, p.display_name, p.email, p.coins,
+    select p.id, p.display_name, p.real_name, p.email, p.coins,
       count(r.session_id)::int, coalesce(sum(r.correct), 0)::int, coalesce(sum(r.total), 0)::int,
       round(100.0 * sum(r.correct) / nullif(sum(r.total), 0), 1), max(s.played_at),
       coalesce((select jsonb_agg(x.acc order by x.played_at) from (
@@ -451,8 +510,8 @@ begin
       and r.session_id in (select id from public.game_sessions where class_id = p_class)
     left join public.game_sessions s on s.id = r.session_id
     where m.class_id = p_class
-    group by p.id, p.display_name, p.email, p.coins
-    order by p.display_name;
+    group by p.id, p.display_name, p.real_name, p.email, p.coins
+    order by coalesce(p.real_name, p.display_name);
 end $$;
 
 create or replace function public.class_sessions(p_class uuid)
@@ -474,7 +533,7 @@ begin
   select * into s from public.game_sessions where id = p_session;
   if not found or s.teacher_id <> auth.uid() then raise exception 'Not your game'; end if;
   return jsonb_build_object('id', s.id, 'played_at', s.played_at, 'mode', s.mode, 'set_title', s.set_title, 'questions', s.questions,
-    'results', coalesce((select jsonb_agg(jsonb_build_object('user_id', r.user_id, 'name', p.display_name, 'score', r.score, 'correct', r.correct,
+    'results', coalesce((select jsonb_agg(jsonb_build_object('user_id', r.user_id, 'name', p.display_name, 'real_name', p.real_name, 'score', r.score, 'correct', r.correct,
         'answered', r.answered, 'total', r.total, 'rank', r.rank, 'missed', r.missed) order by r.rank nulls last, r.score desc)
       from public.game_results r join public.profiles p on p.id = r.user_id where r.session_id = s.id), '[]'::jsonb));
 end $$;
@@ -500,7 +559,8 @@ language plpgsql stable security definer set search_path = public as $$
 begin
   if not public.owns_class(p_class) then raise exception 'Not your class'; end if;
   return jsonb_build_object(
-    'profile', (select jsonb_build_object('id', p.id, 'name', p.display_name, 'email', p.email, 'coins', p.coins) from public.profiles p where p.id = p_user),
+    'profile', (select jsonb_build_object('id', p.id, 'name', p.display_name, 'real_name', p.real_name, 'email', p.email, 'coins', p.coins)
+       from public.profiles p join public.class_members m on m.user_id = p.id and m.class_id = p_class where p.id = p_user),
     'games', coalesce((select jsonb_agg(g order by g ->> 'played_at') from (
         select jsonb_build_object('played_at', s.played_at, 'mode', s.mode, 'set_title', s.set_title, 'score', r.score, 'correct', r.correct,
           'answered', r.answered, 'total', r.total, 'rank', r.rank,
@@ -600,13 +660,44 @@ create or replace function public.players_owned(p_users uuid[]) returns table (i
 language plpgsql stable security definer set search_path = public as $$
 begin
   if not public.is_teacher() then raise exception 'Not a teacher'; end if;
-  return query select p.id, p.owned from public.profiles p where p.id = any (p_users);
+  return query select p.id, p.owned from public.profiles p where p.id = any (p_users) and public.teacher_sees(p.id);
+end $$;
+
+-- The projector asks: which signed-in student is on which iPad in my game?
+create or replace function public.game_roster(p_code text)
+returns table (device text, user_id uuid, display_name text, real_name text, avatar jsonb, owned text[])
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.games g where g.code = p_code and g.teacher_id = auth.uid()) then
+    raise exception 'Not your game';
+  end if;
+  return query select gp.device, p.id, p.display_name, p.real_name, p.avatar, p.owned
+    from public.game_players gp join public.profiles p on p.id = gp.user_id
+    where gp.code = p_code and gp.device is not null;
+end $$;
+
+-- Students who sign in and join this game are added to this class automatically.
+create or replace function public.set_game_class(p_code text, p_class uuid) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.games g where g.code = p_code and g.teacher_id = auth.uid()) then
+    raise exception 'Not your game';
+  end if;
+  if p_class is not null and not public.owns_class(p_class) then raise exception 'Not your class'; end if;
+  update public.games set class_id = p_class where code = p_code;
+  if p_class is not null then
+    insert into public.class_members (class_id, user_id)
+      select p_class, gp.user_id from public.game_players gp where gp.code = p_code on conflict do nothing;
+  end if;
+  return true;
 end $$;
 
 revoke all on function public.list_sets(), public.save_set(text, text, jsonb), public.delete_set(text), public.list_teachers(),
-  public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]) from public, anon;
+  public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]),
+  public.game_roster(text), public.set_game_class(text, uuid) from public, anon;
 grant execute on function public.list_sets(), public.save_set(text, text, jsonb), public.delete_set(text), public.list_teachers(),
-  public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]) to authenticated;
+  public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]),
+  public.game_roster(text), public.set_game_class(text, uuid) to authenticated;
 
 -- ================= Solo practice (study games) =================
 -- Teachers assign question sets to classes; students practice them in single-player games.
@@ -696,14 +787,15 @@ begin
     from public.class_sets cs join public.question_sets q on q.id = cs.set_id where cs.class_id = p_class order by cs.assigned_at;
 end $$;
 
+drop function if exists public.class_practice(uuid, text);
 create or replace function public.class_practice(p_class uuid, p_tz text)
-returns table (user_id uuid, display_name text, sessions integer, minutes integer, last_practiced timestamptz,
+returns table (user_id uuid, display_name text, real_name text, sessions integer, minutes integer, last_practiced timestamptz,
                mastered integer, total_cards integer, streak integer)
 language plpgsql stable security definer set search_path = public as $$
 begin
   if not public.owns_class(p_class) then raise exception 'Not your class'; end if;
   return query
-    select p.id, p.display_name,
+    select p.id, p.display_name, p.real_name,
       (select count(*)::int from public.practice_sessions s where s.user_id = p.id and s.set_id in (select cs.set_id from public.class_sets cs where cs.class_id = p_class)),
       (select coalesce(sum(s.duration_s), 0)::int / 60 from public.practice_sessions s where s.user_id = p.id and s.set_id in (select cs.set_id from public.class_sets cs where cs.class_id = p_class)),
       (select max(s.played_at) from public.practice_sessions s where s.user_id = p.id),
@@ -711,7 +803,7 @@ begin
       (select coalesce(sum(jsonb_array_length(q.items)), 0)::int from public.class_sets cs join public.question_sets q on q.id = cs.set_id where cs.class_id = p_class),
       public.practice_streak(p.id, p_tz)
     from public.class_members m join public.profiles p on p.id = m.user_id
-    where m.class_id = p_class order by p.display_name;
+    where m.class_id = p_class order by coalesce(p.real_name, p.display_name);
 end $$;
 
 -- ---------- Students: practice ----------
@@ -819,6 +911,50 @@ end $$;
 
 revoke all on function public.set_display_name(text), public.rename_student(uuid, text) from public, anon;
 grant execute on function public.set_display_name(text), public.rename_student(uuid, text) to authenticated;
+
+-- ================= Deleting data =================
+-- A student can delete their whole account (profile, coins, items, results, practice).
+-- Everything else in the database is linked with "on delete cascade", so it all goes too.
+create or replace function public.delete_my_data() returns boolean
+language plpgsql security definer set search_path = public, auth as $$
+begin
+  if auth.uid() is null then raise exception 'Not signed in'; end if;
+  if public.is_teacher() then
+    raise exception 'Teacher accounts can''t be deleted here. Ask the site owner to remove you from the teachers list first.';
+  end if;
+  delete from auth.users where id = auth.uid();
+  return true;
+end $$;
+
+-- A teacher deletes a student's data (for example, when a family asks). If the student is
+-- ONLY known to this teacher, the whole account is deleted. If they are also in another
+-- teacher's class, only this teacher's records about them are removed.
+create or replace function public.delete_student_data(p_user uuid) returns text
+language plpgsql security definer set search_path = public, auth as $$
+begin
+  if not public.teacher_sees(p_user) then raise exception 'That student isn''t in one of your classes or games'; end if;
+  if exists (select 1 from public.teachers t join public.profiles p on lower(p.email) = lower(t.email) where p.id = p_user) then
+    raise exception 'That is a teacher account';
+  end if;
+  if not exists (select 1 from public.class_members m join public.classes c on c.id = m.class_id
+                 where m.user_id = p_user and c.teacher_id <> auth.uid())
+     and not exists (select 1 from public.game_players gp join public.games g on g.code = gp.code
+                 where gp.user_id = p_user and g.teacher_id <> auth.uid())
+     and not exists (select 1 from public.game_results r join public.game_sessions s on s.id = r.session_id
+                 where r.user_id = p_user and s.teacher_id <> auth.uid()) then
+    delete from auth.users where id = p_user;
+    return 'deleted';
+  end if;
+  delete from public.game_results r using public.game_sessions s where s.id = r.session_id and r.user_id = p_user and s.teacher_id = auth.uid();
+  delete from public.class_members m using public.classes c where c.id = m.class_id and m.user_id = p_user and c.teacher_id = auth.uid();
+  delete from public.game_players gp using public.games g where g.code = gp.code and gp.user_id = p_user and g.teacher_id = auth.uid();
+  delete from public.practice_cards pc using public.question_sets q where q.id = pc.set_id and pc.user_id = p_user and q.teacher_id = auth.uid();
+  delete from public.practice_sessions ps using public.question_sets q where q.id = ps.set_id and ps.user_id = p_user and q.teacher_id = auth.uid();
+  return 'removed';
+end $$;
+
+revoke all on function public.delete_my_data(), public.delete_student_data(uuid) from public, anon;
+grant execute on function public.delete_my_data(), public.delete_student_data(uuid) to authenticated;
 
 -- ---------- Shop catalog (generated from js/items.js by tools/gen-shop-sql.mjs) ----------
 -- BEGIN SHOP ITEMS

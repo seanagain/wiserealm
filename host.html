@@ -36,8 +36,11 @@
         </div>
         <div id="localNote" class="banner" hidden>🧪 Local Test Mode: only tabs in this browser can join. Use the testing buttons on the right.</div>
       </div>
-      <h2 style="text-align:center;margin:0 0 4px"><span id="playerCount">0</span> heroes ready</h2>
-      <p class="muted" style="text-align:center;margin:0 0 6px;font-size:.9rem">Click a hero to remove them.</p>
+      <div class="lobby-head">
+        <h2 style="margin:0"><span id="playerCount">0</span> heroes ready</h2>
+        <span class="muted" style="font-size:.9rem">Click a hero to remove them.</span>
+        <button class="btn small" id="lockBtn" title="Stop new people from joining (students already in can still rejoin)">🔓 Room open</button>
+      </div>
       <div class="roster" id="roster"></div>
     </div>
     <div class="card side">
@@ -53,6 +56,8 @@
       <p class="muted" style="margin:-6px 0 0;font-size:.82rem">Flipped: show the definition, pick the word.</p>
       <label>Auto-advance <input type="checkbox" id="setAuto"></label>
       <label title="Students can send emotes between questions">Student emotes <input type="checkbox" id="setEmotes"></label>
+      <label title="Only students signed in with their school Google account can join">Require sign-in <input type="checkbox" id="setSignin"></label>
+      <p class="muted" id="signinHint" style="margin:-6px 0 0;font-size:.82rem"></p>
       <label title="How many coins signed-in students earn this game">Coin rewards <select id="setCoins">
         <option value="0">None</option><option value="0.5">Low</option><option value="1">Normal</option><option value="2">High</option><option value="3">Huge</option>
       </select></label>

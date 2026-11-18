@@ -594,3 +594,39 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 @keyframes zapFlash { 50% { filter: brightness(2.2) saturate(1.6); } }
 .mz-bolt { color: #ffe14d; font-size: clamp(15px, 2vw, 30px); text-shadow: 0 0 8px #ffd23f, 0 0 14px #ff9f1c; animation: bob .8s steps(2) infinite; z-index: 1; }
 .mz-hero.armed::after { content: '⚡'; position: absolute; right: -6px; top: 0; font-size: 14px; text-shadow: 0 0 6px #ffd23f; }
+
+/* ===================== Lobby classroom playground ===================== */
+.lobby-head { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; margin: 0 0 8px; }
+.btn.danger { background: var(--bad); color: #fff; }
+.roster.classroom { display: block; position: relative; padding: 0; overflow: hidden; min-height: 280px; background: #6e4528;
+  border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); }
+.cr-wall { position: absolute; left: 0; right: 0; top: 0; height: 34%;
+  background: repeating-linear-gradient(90deg, #4b5a8a 0 48px, #45527e 48px 96px); border-bottom: 8px solid #3a2414; }
+.cr-wall::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: #5a3a24; }
+.cr-board { position: absolute; left: 25%; right: 25%; top: 10%; bottom: 22%; background: #2f5d43; border: 6px solid #9a6233;
+  box-shadow: 0 0 0 3px var(--ink), inset 0 0 0 3px #244a35; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 4px 10px; }
+.cr-chalk { font-family: var(--pixel); color: #f4f1de; font-size: clamp(.8rem, 1.7vw, 1.5rem); opacity: .92; text-align: center; line-height: 1.1; }
+.cr-chalk.small { font-family: inherit; font-size: clamp(.68rem, 1vw, .95rem); opacity: .72; }
+.cr-clock { position: absolute; left: 9%; top: 18%; width: 5%; max-width: 46px; aspect-ratio: 1; }
+.cr-shelf { position: absolute; right: 6%; bottom: 10px; width: 11%; max-width: 110px; aspect-ratio: 10 / 8; }
+.cr-clock svg, .cr-shelf svg, .cr-prop svg { width: 100%; height: 100%; display: block; }
+.cr-floor { position: absolute; left: 0; right: 0; top: 34%; bottom: 0;
+  background: repeating-linear-gradient(180deg, #8a5a32 0 30px, #6e4528 30px 33px); }
+.cr-layer { position: absolute; inset: 0; }
+.cr-prop { position: absolute; transform: translate(-50%, -100%); pointer-events: none; }
+.cr-desk { width: calc(var(--hs, 80px) * 1.15); aspect-ratio: 16 / 10; }
+.cr-tdesk { width: calc(var(--hs, 80px) * 1.7); aspect-ratio: 22 / 10; }
+.roster .lb-hero { position: absolute; left: 0; top: 0; width: var(--hs, 80px); animation: none; will-change: transform; }
+.lb-hero > .av-wrap { animation: pop .3s steps(3); }
+.lb-hero .nm { font-size: .72rem; text-align: center; }
+.lb-hero.face-left > .av-wrap { transform: scaleX(-1); }
+.lb-hero.walking > .av-wrap { animation: walkbob .3s steps(2) infinite; }
+@keyframes walkbob { 50% { translate: 0 -5px; } }
+/* Student wait screen with the walking pad */
+#s-wait.with-pad .hero-big { width: 130px; height: 120px; }
+.lobby-pad { grid-template-columns: repeat(3, min(20vw, 96px)); grid-template-rows: repeat(3, min(20vw, 96px)); margin-top: 4px; }
+.lobby-pad button { font-size: 2rem; }
+.lobby-pad .mid { font-family: var(--pixel); font-size: .8rem; color: var(--muted); }
+.good-note { color: var(--good); margin: 0; font-weight: 600; }
+.invite-row { display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+.invite-row .qr { width: 150px; height: 150px; flex: none; }

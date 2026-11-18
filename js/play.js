@@ -128,7 +128,23 @@ $('#randomize').onclick = () => { profile.av = randomAvatar(); renderBuilder(); 
 const toHost = (m, opts) => {
   try { const r = net && net.toHost(m, opts); if (r && r.catch) r.catch(e => console.warn(e)); } catch (e) { console.warn(e); }
 };
-const sendJoin = (viaRoom = false) => toHost({ t: 'join', id: pid, uid: account ? account.user.id : null, name: profile.name, av: profile.av }, { viaRoom });
+// Privacy: signed-in iPads send a random ticket for this game, never their account ID.
+// The ticket is registered in the database first (join_game), so only the projector can
+// look up whose it is.
+function ticketFor(c) {
+  const key = 'wr_tk_' + pid, all = load(key, {});
+  if (!all[c]) { for (const k of Object.keys(all)) if (Object.keys(all).length > 5) delete all[k]; all[c] = uid(10) + '-' + uid(10); save(key, all); }
+  return all[c];
+}
+let classNote = '';
+async function register() {
+  if (!account) return;
+  try {
+    const r = await accounts.joinGame(code, ticketFor(code));
+    if (r && r.class) classNote = `You’re now in the class “${r.class}”.`;
+  } catch (e) { console.warn(e); }
+}
+const sendJoin = (viaRoom = false) => toHost({ t: 'join', id: pid, tk: account ? ticketFor(code) : null, acct: !!account, name: profile.name, av: profile.av }, { viaRoom });
 
 // If an update seems to be missing (e.g. the iPad dozed off), politely ask the host to resend.
 let lastSync = 0;
@@ -150,6 +166,7 @@ async function connect() {
   }
   joinTries = 0;
   clearInterval(joinTimer);
+  await register();
   sendJoin();
   joinTimer = setInterval(() => {
     if (joined) return clearInterval(joinTimer);
@@ -166,7 +183,13 @@ async function connect() {
   keepAwake();
 }
 
-function message(text) { $('#msgText').textContent = text; show('s-msg'); }
+function message(text) { $('#msgText').textContent = text; $('#msgSignIn').hidden = true; show('s-msg'); }
+function signInNeeded() {
+  $('#msgText').textContent = 'Your teacher wants everyone signed in for this game. Sign in with your school Google account and you’ll come right back.';
+  $('#msgSignIn').hidden = false;
+  show('s-msg');
+}
+$('#msgSignIn').onclick = () => $('#waitSignInBtn').click();
 
 function onMsg(m) {
   if (!m || typeof m !== 'object') return;
@@ -176,17 +199,25 @@ function onMsg(m) {
     if (m.ok) {
       joined = true;
       coinsOn = !!m.coinsOn;
-      // Register this account in the game so it can earn coins.
-      if (account && joinedGame !== code) { joinedGame = code; accounts.joinGame(code).catch(e => console.warn(e)); }
+      joinedGame = code;
       if (m.state) last = m.state;
       render(last || { phase: 'lobby' });
     } else if (m.reason === 'kicked') {
       joined = false; message('Your teacher removed you from this game.');
+    } else if (m.reason === 'locked') {
+      joined = false; message('This game is locked. Ask your teacher to unlock it.');
+    } else if (m.reason === 'signin') {
+      joined = false;
+      if (account) message('We couldn’t check your sign-in for this game. Wait a moment, then tap OK and try again.');
+      else signInNeeded();
     } else {
       joined = false; $('#joinErr').textContent = m.reason || 'Could not join.'; show('s-join');
     }
   } else if (m.t === 'mq' || m.t === 'mres') {
     if (joined) mazeMsg(m);
+  } else if (m.t === 'reg') {
+    // The teacher just signed in on the projector: register again so coins work.
+    if (account && joined) register().then(() => sendJoin());
   } else if (m.t === 'kicked') {
     joined = false; message('Your teacher removed you from this game.');
   } else if (m.t === 'state') {
@@ -254,8 +285,8 @@ function render(s) {
     if (shownKey === key) return;
     shownKey = key;
     showWait(s.phase === 'intro' ? text(s).intro : 'You’re in!',
-      s.phase === 'intro' ? 'Get ready to answer…' : 'Look at the big screen. Your teacher will start soon.' +
-        (account && !coinsOn ? ' (Coins are off for this game.)' : account ? ' Coins are on!' : ''));
+      s.phase === 'intro' ? 'Get ready to answer…' : 'Walk around the classroom on the big screen while you wait!' +
+        (account && !coinsOn ? ' (Coins are off for this game.)' : account ? ' Coins are on!' : ''), s.phase === 'lobby');
   } else if (s.phase === 'question') {
     const newDeadline = performance.now() + (s.remain || 0);
     if (shownKey !== key || Math.abs(newDeadline - deadline) > 1500) deadline = newDeadline;
@@ -298,8 +329,13 @@ function render(s) {
   }
 }
 
-function showWait(title, sub) {
+function showWait(title, sub, lobby = false) {
   $('#waitSignIn').hidden = !!account;
+  $('#waitClass').textContent = classNote;
+  $('#waitClass').hidden = !classNote;
+  $('#lobbyPad').hidden = !lobby;
+  $('#s-wait').classList.toggle('with-pad', lobby);
+  if (!lobby) setDir(null);
   $('#waitHero').innerHTML = avatarSVG(profile.av);
   $('#waitName').textContent = profile.name;
   $('#waitTitle').textContent = title;
@@ -431,17 +467,19 @@ function renderMaze(s) {
 function setDir(d) {
   if (d === mzDir) return;
   mzDir = d;
-  document.querySelectorAll('#dpad button').forEach(b => b.classList.toggle('held', b.dataset.d === d));
+  document.querySelectorAll('.dpad button').forEach(b => b.classList.toggle('held', b.dataset.d === d));
   toHost({ t: 'dir', id: pid, d });
   clearInterval(mzRefresh);
   if (d) mzRefresh = setInterval(() => toHost({ t: 'dir', id: pid, d: mzDir }), 1000); // keeps walking while held
 }
-const dpad = $('#dpad');
-dpad.addEventListener('pointerdown', e => { const b = e.target.closest('[data-d]'); if (!b) return; e.preventDefault(); b.setPointerCapture?.(e.pointerId); setDir(b.dataset.d); });
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => dpad.addEventListener(ev, () => setDir(null)));
-dpad.addEventListener('contextmenu', e => e.preventDefault());
+for (const dpad of document.querySelectorAll('.dpad')) {
+  dpad.addEventListener('pointerdown', e => { const b = e.target.closest('[data-d]'); if (!b) return; e.preventDefault(); b.setPointerCapture?.(e.pointerId); setDir(b.dataset.d); });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => dpad.addEventListener(ev, () => setDir(null)));
+  dpad.addEventListener('contextmenu', e => e.preventDefault());
+}
 const KEYS = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', w: 'u', s: 'd', a: 'l', d: 'r' };
-document.addEventListener('keydown', e => { if ($('#s-maze').classList.contains('active') && KEYS[e.key] && !$('#dpad').hidden) { e.preventDefault(); setDir(KEYS[e.key]); } });
+const padActive = () => ($('#s-maze').classList.contains('active') && !$('#dpad').hidden) || ($('#s-wait').classList.contains('active') && !$('#lobbyPad').hidden);
+document.addEventListener('keydown', e => { if (padActive() && KEYS[e.key]) { e.preventDefault(); setDir(KEYS[e.key]); } });
 document.addEventListener('keyup', e => { if (KEYS[e.key] && KEYS[e.key] === mzDir) setDir(null); });
 
 function mazeMsg(m) {
