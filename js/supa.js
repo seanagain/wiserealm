@@ -83,6 +83,8 @@ const online = {
   gameRoster(code) { return this.rpc('game_roster', { p_code: code }); },
   setGameClass(code, cls) { return this.rpc('set_game_class', { p_code: code, p_class: cls || null }); },
   deleteMyData() { return this.rpc('delete_my_data'); },
+  addUsage(n) { return this.rpc('add_usage', { p_msgs: n }); },
+  siteUsage() { return this.rpc('site_usage'); },
   deleteStudentData(user) { return this.rpc('delete_student_data', { p_user: user }); },
   awardCoins(code, round, awards) { return this.rpc('award_coins', { p_code: code, p_round: round, p_awards: awards }); },
   students() { return this.rpc('list_students'); },
@@ -174,6 +176,13 @@ const demo = {
     save(DEMO_SIGNED, false); return true;
   },
   async deleteStudentData() { return this.deleteMyData().then(() => 'deleted'); },
+  async addUsage(n) { save('wr_demo_usage', load('wr_demo_usage', 0) + (n | 0)); return true; },
+  async siteUsage() {
+    const d = load('wr_demo_db', {}), m = load('wr_demo_usage', 0);
+    return { month_start: new Date().toISOString(), db_bytes: 24e6, students: 1, active_users: 2, msgs_month: m, msgs_today: m,
+      games_month: (d.sessions || []).length, practice_month: (load('wr_demo_db', {}).psessions || []).length,
+      by_teacher: [{ email: 'preview@wiserealm', name: 'Demo Hero', msgs: m, games: (d.sessions || []).length }] };
+  },
   async awardCoins(_code, _round, awards) {
     const p = demoProfile();
     if (awards[p.id]) { p.coins += Math.min(300, Math.max(0, awards[p.id] | 0)); save(DEMO_KEY, p); }

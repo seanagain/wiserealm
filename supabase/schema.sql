@@ -964,6 +964,54 @@ end $$;
 revoke all on function public.delete_my_data(), public.delete_student_data(uuid) from public, anon;
 grant execute on function public.delete_my_data(), public.delete_student_data(uuid) to authenticated;
 
+-- ================= Free plan usage (shared by all teachers) =================
+-- The projector counts roughly how many live-game messages each game uses and adds them here
+-- every minute, so all teachers can see how close the site is to the free plan's limits.
+-- (An estimate: Supabase's own Usage page has the exact numbers.)
+create table if not exists public.usage_daily (
+  day date not null default current_date,
+  teacher_id uuid not null references auth.users (id) on delete cascade,
+  msgs bigint not null default 0,
+  primary key (day, teacher_id)
+);
+alter table public.usage_daily enable row level security;
+
+create or replace function public.add_usage(p_msgs integer) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  if coalesce(p_msgs, 0) <= 0 then return false; end if;
+  insert into public.usage_daily (day, teacher_id, msgs) values (current_date, auth.uid(), least(p_msgs, 200000))
+    on conflict (day, teacher_id) do update set msgs = public.usage_daily.msgs + excluded.msgs;
+  return true;
+end $$;
+
+-- Totals only (no student names). Months are calendar months in UTC.
+create or replace function public.site_usage() returns jsonb
+language plpgsql stable security definer set search_path = public, auth as $$
+declare m timestamptz := date_trunc('month', now());
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  return jsonb_build_object(
+    'month_start', m,
+    'db_bytes', pg_database_size(current_database()),
+    'students', (select count(*) from public.profiles p where not exists (select 1 from public.teachers t where lower(t.email) = lower(coalesce(p.email, '')))),
+    'active_users', (select count(*) from auth.users u where u.last_sign_in_at >= m),
+    'msgs_month', (select coalesce(sum(msgs), 0) from public.usage_daily where day >= m::date),
+    'msgs_today', (select coalesce(sum(msgs), 0) from public.usage_daily where day = current_date),
+    'games_month', (select count(*) from public.game_sessions where played_at >= m),
+    'practice_month', (select count(*) from public.practice_sessions where played_at >= m),
+    'by_teacher', coalesce((select jsonb_agg(x order by x ->> 'msgs' desc) from (
+        select jsonb_build_object('email', t.email, 'name', coalesce(tp.display_name, t.email),
+          'msgs', (select coalesce(sum(d.msgs), 0) from public.usage_daily d where d.teacher_id = u.id and d.day >= m::date),
+          'games', (select count(*) from public.game_sessions s where s.teacher_id = u.id and s.played_at >= m)) x
+        from public.teachers t left join auth.users u on lower(u.email) = lower(t.email)
+        left join public.profiles tp on tp.id = u.id) y), '[]'::jsonb));
+end $$;
+
+revoke all on function public.add_usage(integer), public.site_usage() from public, anon;
+grant execute on function public.add_usage(integer), public.site_usage() to authenticated;
+
 -- ---------- Shop catalog (generated from js/items.js by tools/gen-shop-sql.mjs) ----------
 -- BEGIN SHOP ITEMS
 insert into public.shop_items (id, slot, name, price) values

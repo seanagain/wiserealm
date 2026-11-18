@@ -94,7 +94,21 @@ const ctx = {
 Object.defineProperty(ctx, 'set', { get: () => set });
 
 // ---------------- Networking ----------------
-const send = m => { try { net && net.send(m); } catch (e) { console.warn(e); } };
+const send = m => { try { net && net.send(m); countUsage(1 + humanCount()); } catch (e) { console.warn(e); } };
+
+// ---- Free plan usage: rough count of live-game messages, saved every minute (teacher signed in only) ----
+// Each update from the projector is delivered to every connected iPad; each message from an iPad
+// is counted twice (sent + delivered). Supabase's Usage page has the exact numbers.
+let usage = 0;
+const humanCount = () => { let n = 0; for (const p of G.players.values()) if (!p.bot) n++; return n; };
+function countUsage(n) { if (net && net.mode === 'online') usage += n; }
+function flushUsage() {
+  if (!G.teacher || usage < 1) return;
+  const n = Math.round(usage); usage = 0;
+  accounts.addUsage(n).catch(e => { console.warn(e); usage += n; });
+}
+setInterval(flushUsage, 60000);
+addEventListener('pagehide', flushUsage);
 ctx.send = send;
 
 function stateMsg() {
@@ -123,6 +137,7 @@ function broadcast() { send(stateMsg()); }
 
 function onMsg(m) {
   if (!m || typeof m !== 'object') return;
+  countUsage(2);
   if (m.t === 'join') handleJoin(m);
   else if (m.t === 'ans') handleAns(m);
   else if (m.t === 'sync') resync();

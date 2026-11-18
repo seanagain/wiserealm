@@ -286,6 +286,42 @@ $('#teacherList').addEventListener('click', async e => {
   if (!confirm(`Remove ${b.dataset.rmTeacher} as a teacher? Their classes and sets stay saved but they can’t open them until added again.`)) return;
   try { await accounts.removeTeacher(b.dataset.rmTeacher); renderTeachers(); } catch (err) { alert(err.message); }
 });
+// ---------------- Free plan usage ----------------
+// Supabase's free plan limits (check supabase.com/pricing; update here if they change).
+const LIMITS = { msgs: 2_000_000, db: 500 * 1024 * 1024, users: 50_000 };
+function meter(label, used, limit, fmtv, note = '') {
+  const pct = Math.min(100, (100 * used) / limit);
+  const color = pct >= 85 ? 'var(--bad)' : pct >= 60 ? 'var(--gold)' : 'var(--good)';
+  return `<div class="meter"><div class="flex"><b>${label}</b><span class="spacer"></span><span>${fmtv(used)} / ${fmtv(limit)} <span class="muted">(${pct < 1 && used > 0 ? '<1' : Math.round(pct)}%)</span></span></div>
+    <div class="meter-bar"><span style="width:${Math.max(pct, used > 0 ? 1 : 0)}%;background:${color}"></span></div>${note ? `<div class="muted" style="font-size:.85rem">${note}</div>` : ''}</div>`;
+}
+const mb = b => (b / 1024 / 1024).toFixed(0) + ' MB';
+async function renderUsage() {
+  const box = $('#usageBody');
+  box.textContent = 'Loading…';
+  try {
+    const u = await accounts.siteUsage();
+    const start = new Date(u.month_start), now = new Date();
+    const days = Math.max(1, (now - start) / 86400000), monthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const proj = Math.round((u.msgs_month / days) * monthDays);
+    const perGame = u.games_month ? Math.round(u.msgs_month / u.games_month) : 0;
+    const left = perGame ? Math.max(0, Math.floor((LIMITS.msgs - u.msgs_month) / perGame)) : null;
+    box.innerHTML = `
+      ${meter('Live game messages this month (estimate)', u.msgs_month, LIMITS.msgs, fmt,
+        `Today: ${fmt(u.msgs_today)} · On pace for about ${fmt(proj)} this month.${left !== null ? ` About ${fmt(perGame)} per game, so roughly <b>${fmt(left)} more games</b> fit this month.` : ''}`)}
+      ${meter('Database size', u.db_bytes, LIMITS.db, mb, 'About 25 MB of this is Supabase’s own setup. Each saved game adds only a few KB.')}
+      ${meter('Signed-in users this month', u.active_users, LIMITS.users, fmt, `${fmt(u.students)} student accounts in total.`)}
+      <p style="margin:12px 0 4px"><b>This month:</b> ${fmt(u.games_month)} games saved · ${fmt(u.practice_month)} practice sessions</p>
+      <table class="data-table"><thead><tr><th>Teacher</th><th>Games</th><th>Messages (est.)</th></tr></thead><tbody>
+        ${u.by_teacher.map(t => `<tr><td>${esc(t.name)} <span class="muted" style="font-size:.85rem">${esc(t.email)}</span></td><td>${fmt(t.games)}</td><td>${fmt(t.msgs)}</td></tr>`).join('')}
+      </tbody></table>
+      <p class="muted" style="font-size:.85rem;margin-bottom:0">Messages are counted by the projector when a signed-in teacher hosts, so games hosted while signed out aren’t included.
+        For exact numbers (and log usage), open the Supabase dashboard → <b>Usage</b>. Supabase’s billing month may start on a different day.
+        <button class="btn small" id="usageRefresh">↻ Refresh</button></p>`;
+    $('#usageRefresh').onclick = renderUsage;
+  } catch (e) { box.textContent = e.message; }
+}
+$('#usageBox').addEventListener('toggle', () => { if ($('#usageBox').open) renderUsage(); });
 $('#teachersBox').addEventListener('toggle', () => { if ($('#teachersBox').open) renderTeachers(); });
 
 renderBanner();

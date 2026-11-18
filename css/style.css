@@ -630,3 +630,6 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 .good-note { color: var(--good); margin: 0; font-weight: 600; }
 .invite-row { display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
 .invite-row .qr { width: 150px; height: 150px; flex: none; }
+.meter { margin: 10px 0; }
+.meter-bar { height: 14px; background: var(--ink); border: 2px solid var(--line); margin: 4px 0; }
+.meter-bar span { display: block; height: 100%; }
