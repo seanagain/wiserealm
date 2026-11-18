@@ -236,6 +236,7 @@ const GAME_TEXT = {
   corners: { intro: 'Get ready to run!', right: 'SAFE!', wrong: 'LAVA!' },
   treasure: { intro: 'Treasure Hunt!', right: 'CORRECT!', wrong: 'Not quite!' },
   maze: { intro: 'A wild Mr. C appeared!', right: 'CORRECT!', wrong: 'Not quite!' },
+  territory: { intro: 'Red vs Blue!', right: 'CORRECT!', wrong: 'Not quite!' },
 };
 const text = s => GAME_TEXT[s.mode] || GAME_TEXT.raid;
 
@@ -453,7 +454,9 @@ function renderMaze(s) {
     $('#mzHero').innerHTML = avatarSVG(profile.av);
     $('#mzQ').hidden = true; $('#dpad').hidden = false;
     $('#mzMsg').className = 'card mz-msg';
-    $('#mzMsg').textContent = 'Use the arrows to move your hero through the maze. Watch the big screen!';
+    $('#mzMsg').textContent = s.mode === 'territory'
+      ? `You’re on ${tag ? 'the ' + tag : 'a team'}! Walk with the arrows to paint the arena. Bump into an enemy to duel: answer first to win!`
+      : 'Use the arrows to move your hero through the maze. Watch the big screen!';
     show('s-maze');
     clearInterval(mzClock);
     mzClock = setInterval(() => {
@@ -470,7 +473,9 @@ function setDir(d) {
   document.querySelectorAll('.dpad button').forEach(b => b.classList.toggle('held', b.dataset.d === d));
   toHost({ t: 'dir', id: pid, d });
   clearInterval(mzRefresh);
-  if (d) mzRefresh = setInterval(() => toHost({ t: 'dir', id: pid, d: mzDir }), 1000); // keeps walking while held
+  // Keeps walking while held. In the lobby (just for fun) resend less often to save messages.
+  const lobby = $('#s-wait').classList.contains('active');
+  if (d) mzRefresh = setInterval(() => toHost({ t: 'dir', id: pid, d: mzDir }), lobby ? 3000 : 1000);
 }
 for (const dpad of document.querySelectorAll('.dpad')) {
   dpad.addEventListener('pointerdown', e => { const b = e.target.closest('[data-d]'); if (!b) return; e.preventDefault(); b.setPointerCapture?.(e.pointerId); setDir(b.dataset.d); });
@@ -489,19 +494,21 @@ function mazeMsg(m) {
     mzToken = m.k;
     $('#dpad').hidden = true;
     $('#mzQ').hidden = false;
-    $('#mzKind').textContent = m.kind === 'zap' ? '⚡ ZAP MR. C! Answer right to knock him out!' : m.kind === 'fight' ? '⚔ MR. C ATTACKS! Answer to fight back!' : '🔒 LOCKED GATE: answer to open it';
-    $('#mzKind').className = 'kind ' + (m.kind === 'fight' ? 'fight' : '');
+    $('#mzKind').textContent = m.kind === 'zap' ? '⚡ ZAP MR. C! Answer right to knock him out!' : m.kind === 'fight' ? '⚔ MR. C ATTACKS! Answer to fight back!'
+      : m.kind === 'duel' ? `🗡️ DUEL vs ${m.vs || 'an enemy'}! Answer right FIRST to win!` : m.kind === 'ink' ? '🖌 OUT OF INK: answer to refill' : '🔒 LOCKED GATE: answer to open it';
+    $('#mzKind').className = 'kind ' + (m.kind === 'fight' || m.kind === 'duel' ? 'fight' : '');
     $('#mzPrompt').textContent = m.q.prompt;
     $('#mzChoices').innerHTML = m.q.choices.map((c, i) =>
       `<button class="choice ${CHOICE_STYLE[i].cls}" data-c="${i}"><span class="ico">${CHOICE_STYLE[i].icon}</span><span>${esc(c)}</span></button>`).join('');
-    $('#mzMsg').className = 'card mz-msg ' + (m.kind === 'fight' ? 'bad' : '');
-    $('#mzMsg').textContent = m.kind === 'fight' ? 'Battle! Get it right to bonk Mr. C away!' : 'Answer correctly to unlock this gate.';
+    $('#mzMsg').className = 'card mz-msg ' + (m.kind === 'fight' || m.kind === 'duel' ? 'bad' : '');
+    $('#mzMsg').textContent = m.kind === 'fight' ? 'Battle! Get it right to bonk Mr. C away!' : m.kind === 'duel' ? 'Quick! You both have the same question.'
+      : m.kind === 'ink' ? 'Get it right for a full tank of ink.' : 'Answer correctly to unlock this gate.';
   } else {
     mzToken = null;
     $('#mzQ').hidden = true;
     $('#mzMsg').className = 'card mz-msg ' + (m.ok ? 'good' : 'bad');
     $('#mzMsg').textContent = m.line;
-    $('#mzHearts').textContent = '♥'.repeat(m.hp || 0) + '♡'.repeat(Math.max(0, 3 - (m.hp || 0))) + (m.bolts ? ' ⚡' + m.bolts : '');
+    $('#mzHearts').textContent = m.tag !== undefined ? m.tag : '♥'.repeat(m.hp || 0) + '♡'.repeat(Math.max(0, 3 - (m.hp || 0))) + (m.bolts ? ' ⚡' + m.bolts : '');
     $('#mzScore').textContent = `${fmt(m.score || 0)} pts`;
     if (m.done) { mzDone = true; $('#dpad').hidden = true; setDir(null); }
     else $('#dpad').hidden = false;

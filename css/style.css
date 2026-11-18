@@ -633,3 +633,15 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 .meter { margin: 10px 0; }
 .meter-bar { height: 14px; background: var(--ink); border: 2px solid var(--line); margin: 4px 0; }
 .meter-bar span { display: block; height: 100%; }
+
+/* ===================== Territory Battle ===================== */
+.stage-territory .mz-wrap { flex: 1; height: auto; }
+.ter-bar { display: flex; height: 34px; border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); background: #2a2540; font-family: var(--pixel); font-size: .8rem; overflow: hidden; }
+.ter-bar span { display: grid; place-items: center; color: #fff; text-shadow: 2px 2px 0 var(--ink); transition: width .5s steps(5); min-width: 0; overflow: hidden; }
+.ter-bar .r { background: #e0465f; } .ter-bar .b { background: #3b82f6; margin-left: auto; }
+.ter-base { font-family: var(--pixel); font-size: 8px; color: #fff; text-shadow: 1px 1px 0 var(--ink); z-index: 2; white-space: nowrap; }
+.ter-hero.team1 .nm { background: #8f2335; border: 1px solid #e0465f; }
+.ter-hero.team2 .nm { background: #1e4a91; border: 1px solid #3b82f6; }
+.ter-hero.empty::after { content: '🖌?'; position: absolute; right: -10px; top: -4px; font-size: 11px; background: var(--ink); padding: 0 2px; }
+.ter-hero.team1 .av-wrap { filter: drop-shadow(0 0 2px #ff6b81) drop-shadow(0 0 2px #ff6b81); }
+.ter-hero.team2 .av-wrap { filter: drop-shadow(0 0 2px #6aa8ff) drop-shadow(0 0 2px #6aa8ff); }

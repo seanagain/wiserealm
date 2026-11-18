@@ -3,7 +3,7 @@
 // Nothing here is sent back to the iPads (students watch the big screen), so it uses
 // very few network messages: one when a student presses or lets go of an arrow.
 const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
-const HOLD_MS = 2600;   // an arrow counts as "held" this long unless refreshed (iPads resend every second)
+const HOLD_MS = 4500;   // an arrow counts as "held" this long unless refreshed (iPads resend every 3 seconds here)
 const FLOOR_TOP = 0.34; // heroes' feet stay below the chalkboard wall
 const DESKS = [];
 for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) DESKS.push({ x: 0.2 + c * 0.2, y: 0.52 + r * 0.17 });

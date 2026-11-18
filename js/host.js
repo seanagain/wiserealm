@@ -13,8 +13,9 @@ import raid from './modes/raid.js';
 import corners from './modes/corners.js';
 import treasure from './modes/treasure.js';
 import maze from './modes/maze.js';
+import territory from './modes/territory.js';
 
-export const MODES = { raid, corners, treasure, maze };
+export const MODES = { raid, corners, treasure, maze, territory };
 const params = new URLSearchParams(location.search);
 // The game and question set can be switched in the lobby (same room code, same students).
 let set = getSet(params.get('set'));

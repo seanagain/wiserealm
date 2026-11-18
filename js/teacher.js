@@ -30,6 +30,7 @@ function renderLib() {
         <button class="btn primary small" data-play="${s.id}" data-game="corners">Four Corners</button>
         <button class="btn primary small" data-play="${s.id}" data-game="treasure">Treasure Hunt</button>
         <button class="btn primary small" data-play="${s.id}" data-game="maze">Mr. C’s Maze</button>
+        <button class="btn primary small" data-play="${s.id}" data-game="territory">Territory Battle</button>
       </div>
       <div class="row">
         <button class="btn small" data-edit="${s.id}">Edit</button>

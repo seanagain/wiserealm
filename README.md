@@ -14,6 +14,7 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 | **Four Corners Dash** | Each answer is a corner of the map. Students tap a corner and their hero runs there (they can switch until time's up). Wrong corners turn to lava. 3 hearts each; knocked-out heroes become ghosts who revive after 2 correct answers in a row. |
 | **Treasure Hunt** | A correct answer earns a dig. Diggers pick a spot on the island from their iPads to find gold, gems, chests… or a trap. Luck keeps it close. |
 | **Mr. C’s Maze** | (Optional **⚡ Edison Mode**: purple maze with lightning bolts to zap the Mr. C’s.) Students steer their heroes with arrow buttons on their iPads. Locked gates need a correct answer (everyone unlocks their own). A wild Mr. C roams the maze: if he catches you, answer right to bonk him away or lose a heart. Escape for a big bonus. Everyone plays at their own pace; settings for maze size, time limit and number of Mr. C’s. |
+| **Territory Battle** | Red team vs Blue team. Students walk with arrow buttons and paint the arena their color. Painting uses ink; when it runs out, a correct answer refills it. When two enemies bump into each other, both get the same question: the first right answer wins the duel, splashes paint and sends the other back to base. Most territory when time runs out wins. Settings: time limit, arena size. |
 
 ## The pages
 

@@ -4,7 +4,7 @@ import { accounts } from './supa.js';
 import { newSet, upsertSet, getSets, isSample } from './sets.js';
 import { barChart, sparkline, pctBar, enableTips } from './charts.js';
 
-const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt', maze: 'Mr. C’s Maze' };
+const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt', maze: 'Mr. C’s Maze', territory: 'Territory Battle' };
 const day = d => (d ? new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '-');
 const when = d => (d ? new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-');
 const joinUrl = () => new URL('me.html', location.href).href.replace(/^https?:\/\//, '');

@@ -4,7 +4,7 @@ import { accounts } from './supa.js';
 import { avatarSVG, restrictAvatar } from './avatar.js';
 import { barChart, enableTips } from './charts.js';
 
-const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt', maze: 'Mr. C’s Maze' };
+const MODE_NAMES = { raid: 'Boss Raid', corners: 'Four Corners', treasure: 'Treasure Hunt', maze: 'Mr. C’s Maze', territory: 'Territory Battle' };
 const day = d => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const acc = g => (g.total ? Math.round((100 * g.correct) / g.total) : 0);
 
