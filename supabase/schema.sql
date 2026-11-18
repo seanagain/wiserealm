@@ -78,11 +78,12 @@ $$;
 create or replace function public.make_display_name(meta jsonb, email text) returns text
 language plpgsql immutable as $$
 declare
-  full_name text := trim(coalesce(meta ->> 'full_name', meta ->> 'name', split_part(coalesce(email, 'Hero'), '@', 1)));
+  -- School accounts often include a student ID number (e.g. "Maya Lopez 1150033"); leave it out.
+  full_name text := trim(regexp_replace(coalesce(meta ->> 'full_name', meta ->> 'name', split_part(coalesce(email, 'Hero'), '@', 1)), '[0-9]{3,}', ' ', 'g'));
   parts text[] := regexp_split_to_array(full_name, '\s+');
   n int := coalesce(array_length(parts, 1), 0);
 begin
-  if n = 0 or parts[1] = '' then return 'Hero'; end if;
+  if n = 0 or length(parts[1]) < 2 then return 'Hero'; end if;
   if n = 1 then return left(parts[1], 16); end if;
   return left(parts[1] || ' ' || left(parts[n], 1) || '.', 16);
 end $$;
@@ -344,6 +345,11 @@ drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile" on public.profiles for select using (id = auth.uid() or public.teacher_sees(id));
 drop policy if exists "read own coin history" on public.coin_log;
 create policy "read own coin history" on public.coin_log for select using (user_id = auth.uid() or public.teacher_sees(user_id));
+
+-- Remove student ID numbers from automatic in-game names (only names the student never changed).
+update public.profiles p set display_name = public.make_display_name(u.raw_user_meta_data, u.email)
+  from auth.users u where u.id = p.id and p.display_name ~ '[0-9]{3,}'
+  and position(substring(p.display_name from '[0-9]{3,}') in coalesce(u.raw_user_meta_data ->> 'full_name', u.raw_user_meta_data ->> 'name', u.email, '')) > 0;
 
 -- Backfill real names for accounts made before real_name existed.
 update public.profiles p set real_name = public.real_name_of(u.raw_user_meta_data)
@@ -881,7 +887,9 @@ language plpgsql immutable as $$
 declare n text := regexp_replace(trim(coalesce(p_name, '')), '\s+', ' ', 'g');
 begin
   if length(n) < 2 or length(n) > 16 then raise exception 'Names must be 2 to 16 characters'; end if;
-  if n !~ '^[[:alnum:] .''-]+$' then raise exception 'Names can only use letters, numbers, spaces, periods, apostrophes and dashes'; end if;
+  -- Letters from any language (Chinese, Spanish, Arabic...), numbers, spaces and . ' -
+  -- Written so it works the same whatever the database's language settings are.
+  if n ~ '[\x01-\x1f\x7f!"#$%&()*+,/:;<=>?@\[\\\]^_`{|}~\u00a0\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]' then raise exception 'Names can only use letters, numbers, spaces, periods, apostrophes and dashes'; end if;
   return n;
 end $$;
 
@@ -1038,3 +1046,6 @@ insert into public.shop_items (id, slot, name, price) values
 on conflict (id) do update set slot = excluded.slot, name = excluded.name, price = excluded.price;
 delete from public.shop_items where id not in ('hat_top', 'hat_pirate', 'hat_viking', 'hat_chef', 'hat_frog', 'hat_halo', 'hat_flowers', 'hat_dragon', 'top_armor', 'top_tux', 'top_robe', 'top_jersey', 'top_hawaii', 'top_hoodie', 'cape_red', 'cape_royal', 'cape_shadow', 'cape_ice', 'cape_gold', 'acc_glasses', 'acc_patch', 'acc_stache', 'acc_mask', 'acc_monocle', 'acc_shades', 'pet_slime', 'pet_cat', 'pet_owl', 'pet_duck', 'pet_dragon', 'hat_cowboy', 'hat_party', 'hat_bunny', 'hat_cat', 'hat_astro', 'hat_grad', 'hat_santa', 'hat_mushroom', 'top_space', 'top_super', 'top_lab', 'top_pirate', 'top_rainbow', 'cape_ember', 'cape_forest', 'cape_galaxy', 'acc_clown', 'acc_fangs', 'acc_hearts', 'acc_bandage', 'acc_freckles', 'pet_penguin', 'pet_bunny', 'pet_ghost', 'pet_robot', 'pet_fox', 'pet_phoenix', 'emote_hi', 'emote_gg', 'emote_nice', 'emote_67', 'emote_sheesh', 'emote_bruh', 'emote_oof', 'emote_bigbrain', 'emote_letsgo', 'emote_aura', 'emote_thanks', 'emote_hype', 'emote_dance', 'emote_mindblown', 'emote_clutch', 'emote_freeze', 'emote_respect', 'emote_knewit', 'emote_twist');
 -- END SHOP ITEMS
+
+-- Tell Supabase's API to pick up new and changed functions right away.
+notify pgrst, 'reload schema';
