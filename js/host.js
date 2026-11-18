@@ -1,7 +1,7 @@
 // Game host (projector). This tab runs the game: it checks answers, keeps score and
 // (when the teacher is signed in) awards coins. Each game type lives in js/modes/.
 import { $, $$, esc, show, load, save, fmt, CHOICE_STYLE } from './common.js';
-import { getSet, buildQuestions, cleanItems } from './sets.js';
+import { getSet, getSets, buildQuestions, cleanItems } from './sets.js';
 import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
 import { avatarSVG, normalizeAvatar, avatarColor, randomAvatar } from './avatar.js';
@@ -15,8 +15,9 @@ import maze from './modes/maze.js';
 
 export const MODES = { raid, corners, treasure, maze };
 const params = new URLSearchParams(location.search);
-const set = getSet(params.get('set'));
-const mode = MODES[params.get('game')] || raid;
+// The game and question set can be switched in the lobby (same room code, same students).
+let set = getSet(params.get('set'));
+let mode = MODES[params.get('game')] || raid;
 const S = Object.assign({ time: 20, count: 0, auto: false, flip: false, emotes: true, coinMult: 1 }, load('cq_host_settings', {}));
 const code = String(10000 + Math.floor(Math.random() * 90000));
 const joinBase = new URL('./', location.href).href;
@@ -81,13 +82,15 @@ function intro(html, ms = 2600) {
 }
 
 const ctx = {
-  G, S, set, code, $, $$, esc, fmt, later, wait, sfx, intro, confetti, sparks, floatText,
+  G, S, code, $, $$, esc, fmt, later, wait, sfx, intro, confetti, sparks, floatText,
   heroHTML, avatarSVG, avatarColor, players: playerList, ranked, heroEls,
   broadcast: () => broadcast(),
   setStatus: html => { $('#statusLine').innerHTML = html; },
   setRoundMsg: html => { $('#roundMsg').innerHTML = html; },
   stage: null,
 };
+
+Object.defineProperty(ctx, 'set', { get: () => set });
 
 // ---------------- Networking ----------------
 const send = m => { try { net && net.send(m); } catch (e) { console.warn(e); } };
@@ -220,6 +223,10 @@ function showEmote(p, id) {
   while (feed.children.length > 5) feed.firstChild.remove();
   setTimeout(() => row.remove(), 3000);
 }
+function refreshAutoToggle() {
+  $('#autoToggle').textContent = S.auto ? '⏩ Auto-next: on' : '⏸ Auto-next: off';
+  $('#autoToggle').hidden = !!mode.selfPaced;
+}
 function refreshEmoteToggle() { $('#emoteToggle').textContent = S.emotes === false ? '😶 Emotes off' : '😀 Emotes on'; $('#setEmotes').checked = S.emotes !== false; }
 
 function fail(msg) { $('#errMsg').textContent = msg; show('errScreen'); }
@@ -240,20 +247,35 @@ $('#roster').addEventListener('click', e => {
   renderRoster();
 });
 
-function setupLobby() {
+// Game + question set pickers. Switching keeps the room code and everyone who joined.
+function applyChoice() {
   document.title = `WiseRealm · ${mode.name}`;
   $$('.set-title').forEach(e => (e.textContent = set.title));
   $$('.mode-name').forEach(e => (e.textContent = mode.name));
   $('#modeBlurb').textContent = mode.blurb || '';
+  $('#setGame').value = mode.id;
+  $('#setSet').value = set.id;
+  const n = cleanItems(set.items).length;
+  $('#setCount').innerHTML = `<option value="0">All (${n})</option>` +
+    [5, 10, 15, 20, 30].filter(x => x < n).map(x => `<option value="${x}">${x}</option>`).join('');
+  $('#setCount').value = [...$('#setCount').options].some(o => +o.value === S.count) ? S.count : 0;
+  ['#setTime', '#setCount', '#setAuto'].forEach(sel => ($(sel).closest('label').hidden = !!mode.selfPaced));
+  $('#modeSettings').innerHTML = '';
+  if (mode.settings) mode.settings(ctx, $('#modeSettings'), () => save('cq_host_settings', S));
+  history.replaceState(null, '', `host.html?set=${encodeURIComponent(set.id)}&game=${mode.id}${params.has('debug') ? '&debug' : ''}`);
+  refreshAutoToggle();
+}
+
+function setupLobby() {
+  $('#setGame').innerHTML = Object.values(MODES).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  $('#setSet').innerHTML = getSets().filter(s => cleanItems(s.items).length >= 2).map(s => `<option value="${esc(s.id)}">${esc(s.title)}</option>`).join('');
+  $('#setGame').onchange = () => { mode = MODES[$('#setGame').value] || raid; G.extra = {}; applyChoice(); broadcast(); };
+  $('#setSet').onchange = () => { set = getSet($('#setSet').value) || set; applyChoice(); };
   $('#joinUrl').textContent = joinBase.replace(/^https?:\/\//, '').replace(/index\.html$/, '');
   $('#joinCode').textContent = code;
   $('#smallCode').textContent = code;
   $('#localNote').hidden = isOnline();
 
-  const n = cleanItems(set.items).length;
-  $('#setCount').innerHTML = `<option value="0">All (${n})</option>` +
-    [5, 10, 15, 20, 30].filter(x => x < n).map(x => `<option value="${x}">${x}</option>`).join('');
-  $('#setCount').value = [...$('#setCount').options].some(o => +o.value === S.count) ? S.count : 0;
   $('#setTime').value = S.time;
   $('#setFlip').checked = S.flip;
   $('#setAuto').checked = S.auto;
@@ -261,6 +283,7 @@ function setupLobby() {
     S.time = +$('#setTime').value; S.count = +$('#setCount').value;
     S.flip = $('#setFlip').checked; S.auto = $('#setAuto').checked;
     save('cq_host_settings', S);
+    refreshAutoToggle();
   };
   ['#setTime', '#setCount', '#setFlip', '#setAuto'].forEach(s => $(s).addEventListener('change', persist));
   $('#setCoins').value = String(S.coinMult ?? 1);
@@ -269,9 +292,12 @@ function setupLobby() {
   $('#setEmotes').addEventListener('change', () => { S.emotes = $('#setEmotes').checked; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); });
   $('#emoteToggle').onclick = () => { S.emotes = S.emotes === false; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); };
   refreshEmoteToggle();
-  if (mode.settings) mode.settings(ctx, $('#modeSettings'), () => save('cq_host_settings', S));
-  // Self-paced games (the maze) don't use a shared question timer.
-  if (mode.selfPaced) ['#setTime', '#setCount', '#setAuto'].forEach(sel => ($(sel).closest('label').hidden = true));
+  // Auto-advance can also be switched during a game
+  $('#autoToggle').onclick = () => {
+    S.auto = !S.auto; save('cq_host_settings', S); $('#setAuto').checked = S.auto; refreshAutoToggle();
+    if (S.auto && (G.phase === 'reveal' || G.phase === 'dug') && !$('#nextBtn').hidden) later(next, 3000);
+  };
+  applyChoice();
   loadQR(joinBase + '?join=' + code);
 }
 
@@ -567,15 +593,18 @@ $('#startBtn').onclick = startGame;
 $('#nextBtn').onclick = next;
 $('#skipBtn').onclick = endQuestion;
 $('#endEarly').onclick = () => { if (confirm('End this game now and show results?')) endGame(); };
-$('#againBtn').onclick = () => {
+function backToLobby() {
   clearTimers();
   G.flow++;
   G.phase = 'lobby';
-  for (const p of G.players.values()) { p.score = 0; p.correct = 0; p.streak = 0; }
+  G.extra = {};
+  for (const p of G.players.values()) { p.score = 0; p.correct = 0; p.streak = 0; p.m = {}; }
   renderRoster();
   broadcast();
   show('lobbyScreen');
-};
+}
+$('#againBtn').onclick = backToLobby;
+$('#replayBtn').onclick = () => { backToLobby(); startGame(); };
 function refreshMute() { $$('.mute-btn').forEach(b => (b.textContent = isMuted() ? '🔇 Sound off' : '🔊 Sound on')); }
 $$('.mute-btn').forEach(b => (b.onclick = () => { setMuted(!isMuted()); refreshMute(); }));
 $$('.fs-btn').forEach(b => (b.onclick = () => {

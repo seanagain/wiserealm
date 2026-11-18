@@ -76,7 +76,14 @@ function build(ctx) {
   T.toExit = bfs(T, T.exit.x, T.exit.y);
   const fromStart = bfs(T, 1, 1);
   T.far = floor.filter(t => fromStart[t.y][t.x] > 12);
-  const nMrc = ctx.S.mazeMrc === 'auto' || !ctx.S.mazeMrc ? Math.min(3, Math.max(1, Math.ceil(ctx.players().length / 10))) : +ctx.S.mazeMrc;
+  T.edison = ctx.S.mazeStyle === 'edison';
+  // Edison Mode: lightning bolts to collect (zap Mr. C with them) and one extra Mr. C.
+  T.bolts = new Set();
+  if (T.edison) for (let i = 0; i < Math.max(6, Math.round(floor.length / 16)) && free.length; i++) {
+    const t = free.splice(Math.floor(Math.random() * free.length), 1)[0]; T.bolts.add(key(t.x, t.y));
+  }
+  let nMrc = ctx.S.mazeMrc === 'auto' || !ctx.S.mazeMrc ? Math.min(3, Math.max(1, Math.ceil(ctx.players().length / 10))) : +ctx.S.mazeMrc;
+  if (T.edison) nMrc = Math.min(4, nMrc + 1);
   T.mrcs = Array.from({ length: nMrc }, (_, i) => ({ id: i, ...farSpot(T), last: 0, stunUntil: performance.now() + 6000, busy: false }));
   T.finished = 0;
   T.events = [];
@@ -95,7 +102,7 @@ function ensure(ctx, p) {
   if (p.m.x !== undefined) return;
   const T = ctx.G.extra;
   Object.assign(p.m, { x: T.start.x, y: T.start.y, dir: null, dirAt: 0, last: 0, busy: null, cool: 0, inv: 0, hearts: HEARTS,
-    unlocked: new Set(), check: { ...T.start }, qorder: [], finished: false, place: 0 });
+    unlocked: new Set(), check: { ...T.start }, qorder: [], finished: false, place: 0, bolts: 0 });
   p.asked = p.asked || 0;
 }
 
@@ -120,8 +127,8 @@ function drawBoard(ctx) {
       const wall = T.g[y][x] === 1; let n = 1;
       while (x + n < T.W && (T.g[y][x + n] === 1) === wall) n++;
       rects += wall
-        ? `<rect x="${x}" y="${y}" width="${n + 0.02}" height="1.02" fill="#3b3652"/><rect x="${x}" y="${y}" width="${n}" height="0.18" fill="#57516e"/>`
-        : `<rect x="${x}" y="${y}" width="${n + 0.02}" height="1.02" fill="#1c1829"/>`;
+        ? `<rect x="${x}" y="${y}" width="${n + 0.02}" height="1.02" fill="${T.edison ? '#5b3fa8' : '#3b3652'}"/><rect x="${x}" y="${y}" width="${n}" height="0.18" fill="${T.edison ? '#a77bff' : '#57516e'}"/>`
+        : `<rect x="${x}" y="${y}" width="${n + 0.02}" height="1.02" fill="${T.edison ? '#1a0f2e' : '#1c1829'}"/>`;
       x += n;
     }
   }
@@ -129,9 +136,11 @@ function drawBoard(ctx) {
     `<div class="mz-start" style="left:${pct(T, 1, 1).left};top:${pct(T, 1, 1).top}">START</div>` +
     `<div class="mz-exit" style="left:${pct(T, T.exit.x, T.exit.y).left};top:${pct(T, T.exit.x, T.exit.y).top}">🏆</div>` +
     T.gates.map(g => `<div class="mz-gate" id="gate${g.id}" style="left:${pct(T, g.x, g.y).left};top:${pct(T, g.x, g.y).top}">🔒<span>${g.opened}</span></div>`).join('') +
+    [...T.bolts].map(k => { const [x, y] = k.split(',').map(Number); return `<div class="mz-bolt" data-k="${k}" style="left:${pct(T, x, y).left};top:${pct(T, x, y).top}">⚡</div>`; }).join('') +
     [...T.gems].map(k => { const [x, y] = k.split(',').map(Number); return `<div class="mz-gem" data-k="${k}" style="left:${pct(T, x, y).left};top:${pct(T, x, y).top}">◆</div>`; }).join('') +
     T.mrcs.map(m => `<div class="mz-mrc" id="mrc${m.id}">${bossSVG(MRC)}</div>`).join('');
   board.style.setProperty('--tile', (100 / T.W) + '%');
+  board.classList.toggle('edison', !!T.edison);
   heroEls.clear();
   for (const p of players()) {
     ensure(ctx, p);
@@ -157,6 +166,7 @@ function place(ctx, p) {
   el.classList.toggle('fight', !!(p.m.busy && p.m.busy.kind === 'fight'));
   el.classList.toggle('inv', performance.now() < p.m.inv);
   el.classList.toggle('done', p.m.finished);
+  el.classList.toggle('armed', p.m.bolts > 0);
 }
 
 function placeMrc(T, m) {
@@ -177,7 +187,8 @@ function renderBoard(ctx) {
   const top = ctx.ranked().slice(0, 8);
   $('#mzSide').innerHTML = `<h3>Leaderboard</h3>` + top.map((p, i) =>
     `<div class="brow"><span>${i + 1}. ${p.m.finished ? '🏆 ' : ''}${esc(p.name)}</span><b>${fmt(p.score)}</b></div>`).join('') +
-    `<h3 style="margin-top:14px">Legend</h3><div class="muted" style="font-size:.85rem;line-height:1.7">🔒 Gate: answer to unlock<br>◆ Gem: +50<br>🏆 Exit: escape for a big bonus<br>Wild Mr. C: answer right to bonk him!</div>`;
+    `<h3 style="margin-top:14px">Legend</h3><div class="muted" style="font-size:.85rem;line-height:1.7">🔒 Gate: answer to unlock<br>◆ Gem: +50<br>🏆 Exit: escape for a big bonus<br>Wild Mr. C: answer right to bonk him!` +
+    (ctx.G.extra.edison ? `<br><b style="color:var(--gold)">⚡ Bolt:</b> run into a Mr. C to ZAP him (+300)` : '') + `</div>`;
 }
 
 // ---------------- Questions ----------------
@@ -225,6 +236,23 @@ function answer(ctx, p, token, c) {
       line = `Not quite (answer: ${q.choices[q.correct]}). The gate stays locked. Try again in a moment!`;
       sfx('bad');
     }
+  } else if (b.kind === 'zap') {
+    const m = T.mrcs[b.mrc];
+    m.busy = false; p.m.bolts = Math.max(0, p.m.bolts - 1);
+    if (ok) {
+      p.score += 300; p.m.inv = now + 2500;
+      Object.assign(m, farSpot(T, p.m), { stunUntil: now + 12000 });
+      placeMrc(T, m);
+      line = '⚡ ZAP! You knocked Mr. C out for a while! +300';
+      event(ctx, `<span style="color:var(--gold)">⚡ ${ctx.esc(p.name)} ZAPPED Mr. C!</span>`);
+      sfx('explode');
+      const board = $('#mzBoard'); board.classList.remove('zap'); void board.offsetWidth; board.classList.add('zap');
+      floatText(board, 'ZAP!', 'crit', ((p.m.x + 0.5) / T.W) * 100, ((p.m.y) / T.H) * 100);
+    } else {
+      p.m.inv = now + 2500; m.stunUntil = now + 2000;
+      line = `Your bolt fizzled! (Answer: ${q.choices[q.correct]}) Get away from Mr. C!`;
+      sfx('bad');
+    }
   } else if (b.kind === 'fight') {
     const m = T.mrcs[b.mrc];
     m.busy = false;
@@ -251,7 +279,7 @@ function answer(ctx, p, token, c) {
     }
   }
   place(ctx, p);
-  ctx.send({ t: 'mres', to: p.id, ok, line, hp: p.m.hearts, score: p.score });
+  ctx.send({ t: 'mres', to: p.id, ok, line, hp: p.m.hearts, score: p.score, bolts: p.m.bolts });
   renderBoard(ctx);
 }
 
@@ -283,6 +311,12 @@ function tryMove(ctx, p, d) {
     T.gems.delete(k); p.score += 50;
     const gem = ctx.$(`#mzBoard .mz-gem[data-k="${k}"]`); if (gem) gem.remove();
     ctx.sfx('join'); renderBoard(ctx);
+  }
+  if (T.bolts.has(k) && p.m.bolts < 3) {
+    T.bolts.delete(k); p.m.bolts++; p.score += 20;
+    const bolt = ctx.$(`#mzBoard .mz-bolt[data-k="${k}"]`); if (bolt) bolt.remove();
+    ctx.sfx('crit');
+    ctx.send({ t: 'mres', to: p.id, ok: true, line: `⚡ You got a lightning bolt (${p.m.bolts})! Run into a Mr. C to zap him.`, hp: p.m.hearts, score: p.score, bolts: p.m.bolts });
   }
   place(ctx, p);
   if (nx === T.exit.x && ny === T.exit.y) finish(ctx, p);
@@ -323,6 +357,12 @@ function checkCatch(ctx, now) {
     const p = ctx.players().find(p => !p.m.finished && !p.m.busy && now >= p.m.inv && p.m.x === m.x && p.m.y === m.y);
     if (!p) continue;
     m.busy = true;
+    if (p.m.bolts > 0) {
+      ctx.sfx('warning');
+      event(ctx, `<span style="color:var(--gold)">⚡ ${ctx.esc(p.name)} is zapping Mr. C!</span>`);
+      ask(ctx, p, 'zap', { mrc: m.id });
+      continue;
+    }
     ctx.sfx('roar');
     event(ctx, `<span class="bad">⚔ Mr. C caught ${ctx.esc(p.name)}! Battle!</span>`);
     ask(ctx, p, 'fight', { mrc: m.id });
@@ -340,8 +380,10 @@ export default {
 
   settings(ctx, el, persist) {
     const { S } = ctx;
-    S.mazeSize = S.mazeSize || 'medium'; S.mazeMins = S.mazeMins || 6; S.mazeMrc = S.mazeMrc || 'auto';
-    el.innerHTML = `<label>Maze size <select id="mzSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+    S.mazeSize = S.mazeSize || 'medium'; S.mazeMins = S.mazeMins || 6; S.mazeMrc = S.mazeMrc || 'auto'; S.mazeStyle = S.mazeStyle || 'classic';
+    el.innerHTML = `<label>Maze style <select id="mzStyle"><option value="classic">Classic</option><option value="edison">⚡ Edison Mode</option></select></label>
+      <p class="muted" style="margin:-6px 0 0;font-size:.8rem" id="mzStyleHint"></p>
+      <label>Maze size <select id="mzSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
       <label>Time limit <select id="mzMins">${[3, 5, 6, 8, 10, 15].map(m => `<option value="${m}">${m} min</option>`).join('')}</select></label>
       <label>Wild Mr. C’s <select id="mzMrc"><option value="auto">Auto (1 per 10 players)</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>`;
     const sz = el.querySelector('#mzSize'), mn = el.querySelector('#mzMins'), mr = el.querySelector('#mzMrc');
@@ -349,10 +391,16 @@ export default {
     sz.onchange = () => { S.mazeSize = sz.value; persist(); };
     mn.onchange = () => { S.mazeMins = +mn.value; persist(); };
     mr.onchange = () => { S.mazeMrc = mr.value; persist(); };
+    const st = el.querySelector('#mzStyle'), hint = el.querySelector('#mzStyleHint');
+    const showHint = () => (hint.textContent = S.mazeStyle === 'edison' ? 'Purple maze with ⚡ lightning bolts. Grab one and run into a Mr. C to zap him! (+1 extra Mr. C)' : '');
+    st.value = S.mazeStyle; showHint();
+    st.onchange = () => { S.mazeStyle = st.value; persist(); showHint(); };
   },
 
   mount(ctx) {
-    ctx.stage.innerHTML = `<div class="mz-wrap"><div class="mz-board-wrap" id="mzBoardWrap"><div class="mz-board" id="mzBoard"></div></div><div class="card cboard" id="mzSide"></div></div>`;
+    ctx.stage.innerHTML = `<div class="mz-wrap"><div class="mz-board-wrap" id="mzBoardWrap"><div class="mz-board" id="mzBoard"></div></div>
+      <div class="mz-side"><div class="card mz-timer-card"><div class="muted">TIME LEFT</div><div class="mz-timer" id="mzTimer">--:--</div><div class="muted" id="mzEscaped"></div></div>
+      <div class="card cboard" id="mzSide"></div></div></div>`;
     ctx.G.extra = build(ctx);
     for (const p of ctx.players()) { p.m = {}; p.asked = 0; ensure(ctx, p); }
     drawBoard(ctx);
@@ -363,6 +411,7 @@ export default {
     fitBoard(ctx);
     ctx.sfx('warning');
     ctx.later(() => ctx.sfx('roar'), 850);
+    if (ctx.G.extra.edison) return ctx.intro(`<span style="color:#c77dff">⚡ EDISON MODE ⚡</span><br>The Mr. C’s are loose in the purple maze!<br><span style="font-size:.5em" class="muted">Grab lightning bolts and zap them! Answer questions to open gates.</span>`, 3400);
     await ctx.intro(`<span style="color:var(--bad)">!! WARNING !!</span><br>A wild Mr. C appeared in the maze!<br><span style="font-size:.5em" class="muted">Use the arrows on your iPad. Answer questions to open gates.</span>`, 3200);
   },
 
@@ -379,7 +428,10 @@ export default {
         const left = Math.max(0, T.endAt - now);
         const all = ctx.players();
         const done = all.filter(p => p.m.finished).length;
-        ctx.setStatus(`⏱ ${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')} left · ${done} / ${all.length} escaped`);
+        const clock = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+        ctx.setStatus(`⏱ ${clock} left · ${done} / ${all.length} escaped`);
+        const tEl = ctx.$('#mzTimer');
+        if (tEl) { tEl.textContent = clock; tEl.classList.toggle('urgent', left < 30000); ctx.$('#mzEscaped').textContent = `${done} / ${all.length} escaped`; }
         if (left <= 0 || (all.length && done === all.length)) { clearInterval(iv); resolve(); return; }
         for (const p of all) {
           ensure(ctx, p);
@@ -413,7 +465,7 @@ export default {
   },
 
   publicState(ctx) { const T = ctx.G.extra; return T && T.endAt ? { left: Math.max(0, T.endAt - performance.now()) } : {}; },
-  tag(ctx, p) { return p.m && p.m.hearts !== undefined ? '♥'.repeat(p.m.hearts) + '♡'.repeat(HEARTS - p.m.hearts) : ''; },
+  tag(ctx, p) { return p.m && p.m.hearts !== undefined ? '♥'.repeat(p.m.hearts) + '♡'.repeat(HEARTS - p.m.hearts) + (p.m.bolts ? ' ⚡' + p.m.bolts : '') : ''; },
   hud(ctx) { const T = ctx.G.extra; return T && T.finished !== undefined ? `${T.finished} escaped` : ''; },
 
   endInfo(ctx) {

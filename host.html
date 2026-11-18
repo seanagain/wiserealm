@@ -41,7 +41,8 @@
       <div class="roster" id="roster"></div>
     </div>
     <div class="card side">
-      <h3 style="margin:0" class="mode-name"></h3>
+      <label>Game <select id="setGame"></select></label>
+      <label>Question set <select id="setSet" style="max-width:190px"></select></label>
       <p class="muted" id="modeBlurb" style="margin:-4px 0 0;font-size:.9rem"></p>
       <label>Time per question <select id="setTime">
         <option value="10">10 sec</option><option value="15">15 sec</option><option value="20">20 sec</option>
@@ -79,6 +80,7 @@
     <div class="muted">Code <b id="smallCode"></b></div>
     <button class="btn small mute-btn"></button>
     <button class="btn small fs-btn">⛶</button>
+    <button class="btn small" id="autoToggle"></button>
     <button class="btn small" id="emoteToggle"></button>
     <button class="btn small danger" id="endEarly">End game</button>
   </div>
@@ -118,7 +120,8 @@
     <div class="stat-row" id="endList"></div>
     <div id="coinStatus" class="muted" style="font-size:1.1rem"></div>
     <div class="flex" style="justify-content:center">
-      <button class="btn primary big" id="againBtn">Play again</button>
+      <button class="btn primary big" id="replayBtn">Play again</button>
+      <button class="btn big" id="againBtn">Back to lobby (switch game)</button>
       <a class="btn big" href="teacher.html">Done</a>
     </div>
   </div>

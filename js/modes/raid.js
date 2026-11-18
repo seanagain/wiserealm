@@ -1,5 +1,25 @@
 // Boss Raid: the whole class teams up. Correct answers attack the boss.
+// 3+ right in a row = STREAK CRIT (double damage). The boss attacks back after every question:
+// the more students miss, the harder it hits the team. Team HP 0 = the boss wins.
 import { BOSSES, bossSVG } from '../boss.js';
+
+// Boss difficulty: health multiplier and how hard it hits back (team damage if everyone missed).
+export const LEVELS = {
+  easy: { label: 'Easy', hp: 0.6, atk: 15 },
+  normal: { label: 'Normal', hp: 1, atk: 25 },
+  hard: { label: 'Hard', hp: 1.4, atk: 32 },
+  epic: { label: 'Epic', hp: 2, atk: 40 },
+};
+const level = S => LEVELS[S.bossLevel] || LEVELS.normal;
+
+function setTeam(ctx, v) {
+  const R = ctx.G.extra;
+  R.visTeam = Math.max(0, Math.min(100, v));
+  const f = R.visTeam / 100;
+  ctx.$('#teamFill').style.transform = `scaleX(${f})`;
+  ctx.$('#teamText').textContent = `${Math.round(R.visTeam)} / 100`;
+  ctx.$('#teamBar').classList.toggle('low', f < 0.3);
+}
 
 function setHp(ctx, v) {
   const { G, $, fmt } = ctx, R = G.extra;
@@ -29,8 +49,39 @@ function renderPlayers(ctx) {
 function bossHit(ctx, h) {
   const b = ctx.$('#boss');
   b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit');
-  ctx.floatText(ctx.$('#bossArea'), (h.crit ? 'CRIT ' : '') + ctx.fmt(h.dmg), h.crit ? 'crit' : '');
+  ctx.floatText(ctx.$('#bossArea'), (h.crit ? '🔥 STREAK CRIT ' : '') + ctx.fmt(h.dmg), h.crit ? 'crit streak' : '');
   ctx.sfx(h.crit ? 'crit' : 'hit');
+  if (h.crit) { const br = b.getBoundingClientRect(); ctx.sparks(br.left + br.width / 2, br.top + br.height / 2, '#ff7b00', 14, 120); }
+}
+
+// The boss lunges and throws a fireball at the party; heroes who missed flash red.
+function bossAttack(ctx, teamDmg, results, after) {
+  const { later, $, sfx, heroEls } = ctx;
+  if (!teamDmg) {
+    later(() => { ctx.floatText($('#bossArea'), 'MISS!', ''); }, after + 200);
+    return 600;
+  }
+  later(() => {
+    const boss = $('#boss');
+    boss.classList.remove('lunge'); void boss.offsetWidth; boss.classList.add('lunge');
+    sfx('roar');
+    const br = boss.getBoundingClientRect(), pr = $('#party').getBoundingClientRect();
+    const ball = document.createElement('div');
+    ball.className = 'fireball';
+    ball.style.left = br.left + br.width / 2 - 20 + 'px'; ball.style.top = br.top + br.height * 0.6 + 'px';
+    document.body.append(ball);
+    ball.animate([{ transform: 'translate(0,0) scale(.6)' }, { transform: `translate(${pr.left + pr.width / 2 - (br.left + br.width / 2)}px, ${pr.top + pr.height * 0.3 - (br.top + br.height * 0.6)}px) scale(1.4)` }],
+      { duration: 600, easing: 'ease-in' }).onfinish = () => {
+      ball.remove();
+      sfx('explode');
+      ctx.sparks(pr.left + pr.width / 2, pr.top + pr.height * 0.3, '#ff7b00', 18, 160);
+      $('#party').classList.remove('shake'); void $('#party').offsetWidth; $('#party').classList.add('shake');
+      for (const r of results) if (!r.correct) { const el = heroEls.get(r.p.id); if (el) { el.classList.remove('hurt'); void el.offsetWidth; el.classList.add('hurt'); } }
+      setTeam(ctx, ctx.G.extra.team);
+      ctx.floatText($('#bossArea'), `-${teamDmg} TEAM HP`, 'teamhit', 50, 80);
+    };
+  }, after + 150);
+  return 1400;
 }
 
 function animateAttacks(ctx, hits) {
@@ -74,8 +125,17 @@ export default {
   settings(ctx, el, persist) {
     const { S, esc, $$ } = ctx;
     if (!(S.boss >= 0 && S.boss < BOSSES.length)) S.boss = 0;
+    if (!LEVELS[S.bossLevel]) S.bossLevel = 'normal';
+    if (S.bossAttacks === undefined) S.bossAttacks = true;
     el.innerHTML = `<div style="margin-bottom:6px">Boss</div><div class="boss-pick" id="bossPick">${BOSSES.map((b, i) => `<button data-b="${i}" title="${esc(b.name)}">${bossSVG(i)}</button>`).join('')}</div>
-      <div class="muted" id="bossName" style="font-size:.85rem;margin-top:4px"></div>`;
+      <div class="muted" id="bossName" style="font-size:.85rem;margin-top:4px"></div>
+      <label style="margin-top:8px">Boss health <select id="bossLevel">${Object.entries(LEVELS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+      <label>Boss attacks back <input type="checkbox" id="bossAttacks"></label>
+      <p class="muted" style="margin:-4px 0 0;font-size:.8rem">After each question the boss hits the team. More misses = bigger hit. Team HP 0 = boss wins.</p>`;
+    const lv = el.querySelector('#bossLevel'), ak = el.querySelector('#bossAttacks');
+    lv.value = S.bossLevel; ak.checked = S.bossAttacks;
+    lv.onchange = () => { S.bossLevel = lv.value; persist(); };
+    ak.onchange = () => { S.bossAttacks = ak.checked; persist(); };
     const mark = () => {
       $$('#bossPick button').forEach(b => b.classList.toggle('sel', +b.dataset.b === S.boss));
       el.querySelector('#bossName').textContent = BOSSES[S.boss].name;
@@ -90,13 +150,16 @@ export default {
       <div class="hp-wrap"><div class="hp-name" id="bossTitle"></div>
         <div class="hp-bar"><div class="hp-ghost" id="hpGhost"></div><div class="hp-fill" id="hpFill"></div><div class="hp-text" id="hpText"></div></div></div>
       <div class="boss-area" id="bossArea"><div class="boss" id="boss"></div></div>
+      <div class="hp-wrap team-wrap" ${S.bossAttacks === false ? 'hidden' : ''}><div class="hp-name">Team HP</div>
+        <div class="hp-bar team" id="teamBar"><div class="hp-fill team-fill" id="teamFill"></div><div class="hp-text" id="teamText"></div></div></div>
       <div class="party" id="party"></div>`;
-    // Boss health scales with class size so roughly 65-70% accuracy wins.
-    const max = Math.max(300, Math.round((players().length * G.qs.length * 150 * 0.65) / 50) * 50);
-    G.extra = { bossMax: max, bossHp: max, visHp: max };
+    // Boss health scales with class size so roughly 65-70% accuracy wins on Normal.
+    const max = Math.max(300, Math.round((players().length * G.qs.length * 150 * 0.65 * level(S).hp) / 50) * 50);
+    G.extra = { bossMax: max, bossHp: max, visHp: max, team: 100, visTeam: 100 };
     ctx.$('#boss').innerHTML = bossSVG(S.boss);
     ctx.$('#bossTitle').textContent = BOSSES[S.boss].name;
     setHp(ctx, max);
+    setTeam(ctx, 100);
     renderPlayers(ctx);
   },
 
@@ -116,7 +179,7 @@ export default {
   onAnswer(ctx, p) { ctx.heroEls.get(p.id)?.classList.add('done'); },
 
   reveal(ctx, q, results) {
-    const { G, fmt, esc, heroEls } = ctx, R = G.extra;
+    const { G, S, fmt, esc, heroEls } = ctx, R = G.extra;
     const res = {}, hits = [];
     let total = 0, nCorrect = 0;
     for (const r of results) {
@@ -124,34 +187,34 @@ export default {
       let dmg = 0;
       if (r.correct) {
         dmg = 100 + Math.round(100 * (1 - r.frac));
-        if (p.streak >= 3) dmg = Math.round(dmg * 1.25);
+        const streakCrit = p.streak >= 3; // 3+ right in a row = double damage
+        if (streakCrit) dmg *= 2;
         p.score += dmg; nCorrect++; total += dmg;
-        hits.push({ id: p.id, dmg, crit: r.frac < 0.25, el: a.el });
+        hits.push({ id: p.id, dmg, crit: streakCrit, streak: p.streak, el: a.el });
       }
       heroEls.get(p.id)?.classList.remove('done');
       if (!r.correct) heroEls.get(p.id)?.classList.add('miss');
-      if (!p.bot && a) res[p.id] = [a.c, dmg, r.correct ? `You dealt ${fmt(dmg)} damage!` + (p.streak >= 3 ? ` 🔥 ${p.streak} in a row!` : '') : ''];
+      if (!p.bot && a) res[p.id] = [a.c, dmg, r.correct ? (p.streak >= 3 ? `🔥 STREAK CRIT! ${p.streak} in a row: ${fmt(dmg)} damage!` : `You dealt ${fmt(dmg)} damage!${p.streak === 2 ? ' One more right for a STREAK CRIT!' : ''}`) : ''];
     }
     hits.sort((a, b) => a.el - b.el);
-    const acc = results.length ? nCorrect / results.length : 0;
-    let newHp = R.bossHp - total, heal = 0;
-    if (newHp <= 0) newHp = 0;
-    else if (acc < 0.4) { heal = Math.round(R.bossMax * 0.05); newHp = Math.min(R.bossMax, newHp + heal); }
-    R.bossHp = newHp;
+    R.bossHp = Math.max(0, R.bossHp - total);
+    // The boss strikes back (if it's still standing): damage grows with the share of misses.
+    const missFrac = results.length ? (results.length - nCorrect) / results.length : 0;
+    const attacks = S.bossAttacks !== false && R.bossHp > 0;
+    const teamDmg = attacks ? Math.round(missFrac * level(S).atk) : 0;
+    if (attacks) R.team = Math.max(0, R.team - teamDmg);
+    for (const r of results) {
+      if (r.correct || r.p.bot || !teamDmg) continue;
+      res[r.p.id] = [r.a ? r.a.c : -1, 0, `The boss hit your team for ${teamDmg}! Team HP: ${R.team}`];
+    }
     const fastest = hits[0] ? G.players.get(hits[0].id) : null;
     ctx.setRoundMsg(`<span class="good">${nCorrect} / ${results.length} hit!</span>` + (fastest ? ` <span class="muted">· Fastest: ${esc(fastest.name)}</span>` : ''));
 
     const dur = animateAttacks(ctx, hits);
+    let extra = 0;
+    if (attacks) extra = bossAttack(ctx, teamDmg, results, dur);
     ctx.later(() => {
-      setHp(ctx, R.bossHp - heal);
-      if (heal) {
-        ctx.floatText(ctx.$('#bossArea'), '+' + fmt(heal), 'heal');
-        ctx.sfx('roar'); ctx.sfx('heal');
-        ctx.$('#boss').classList.add('roar');
-        ctx.later(() => ctx.$('#boss').classList.remove('roar'), 800);
-        ctx.later(() => setHp(ctx, R.bossHp), 300);
-        ctx.setRoundMsg(ctx.$('#roundMsg').innerHTML + ' <span class="bad">· Too many misses, the boss healed!</span>');
-      }
+      setHp(ctx, R.bossHp);
       if (R.bossHp <= 0) {
         ctx.$('#boss').classList.add('dead');
         const br = ctx.$('#boss').getBoundingClientRect();
@@ -161,13 +224,16 @@ export default {
       }
     }, dur);
     const pct = Math.round((R.bossHp / R.bossMax) * 100);
-    const note = R.bossHp <= 0 ? 'The boss is going down!' : heal ? 'Too many misses, so the boss healed! Teamwork next time!' : `Boss HP: ${pct}%`;
-    return { res, note, duration: dur + 200, overDelay: 1900 };
+    const note = R.bossHp <= 0 ? 'The boss is going down!' : R.team <= 0 ? 'The boss defeated your team!' : teamDmg ? `Boss HP ${pct}% · The boss hit the team for ${teamDmg} (Team HP ${R.team})` : `Boss HP: ${pct}%`;
+    return { res, note, duration: dur + extra + 200, overDelay: 1900 };
   },
 
-  isOver(ctx) { return ctx.G.extra.bossHp <= 0; },
+  isOver(ctx) { const R = ctx.G.extra; return R.bossHp <= 0 || R.team <= 0; },
 
-  hud(ctx) { const R = ctx.G.extra; return R && R.bossMax ? `Boss HP ${Math.max(0, Math.round((R.bossHp / R.bossMax) * 100))}%` : ''; },
+  hud(ctx) {
+    const R = ctx.G.extra; if (!R || !R.bossMax) return '';
+    return `Boss ${Math.max(0, Math.round((R.bossHp / R.bossMax) * 100))}%` + (ctx.S.bossAttacks !== false ? ` · Team ♥ ${R.team}` : '');
+  },
 
   endInfo(ctx) {
     const { G, S, fmt, players } = ctx, R = G.extra;
@@ -177,6 +243,7 @@ export default {
     const acc = list.length ? Math.round((list.reduce((s, p) => s + p.correct, 0) / (list.length * asked)) * 100) : 0;
     const name = BOSSES[S.boss].name;
     const win = R.bossHp <= 0;
+    if (!win && R.team <= 0) return { win: false, title: '💀 Party defeated!', sub: `${name} knocked out your team with ${fmt(R.bossHp)} HP left. ${acc}% correct. Rematch?` };
     return win
       ? { win, title: '🏆 Victory!', sub: `Your class defeated ${name}! ${fmt(total)} total damage · ${acc}% correct` }
       : { win, title: '💨 The boss escaped!', sub: `${name} got away with ${fmt(R.bossHp)} HP left. ${acc}% correct. Rematch?` };

@@ -568,3 +568,29 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 .acct .acct-actions .btn { text-align: center; padding-left: 4px; padding-right: 4px; }
 .acct > .grow { width: 100%; }
 @media (max-width: 420px) { .acct .acct-actions { grid-template-columns: repeat(2, 1fr); } }
+
+/* Boss Raid: team HP + boss counterattack */
+.team-wrap { margin: 2px 0 0; }
+.hp-bar.team { height: 24px; }
+.team-fill { background: linear-gradient(#7af0a8 0 25%, #3ddc84 25% 72%, #1f9d58 72%) !important; }
+.hp-bar.team.low { animation: blink .5s steps(2) infinite; }
+.boss.lunge { animation: lunge .6s steps(4); }
+@keyframes lunge { 40% { transform: translateY(30px) scale(1.12); } }
+.fireball { position: fixed; width: 40px; height: 40px; z-index: 22; pointer-events: none; background: radial-gradient(circle, #fff3b0 0 25%, #ffd23f 25% 45%, #ff7b00 45% 70%, transparent 71%); }
+.party.shake { animation: sad .5s steps(4); }
+.party .hero.hurt { animation: sad .6s steps(4); filter: drop-shadow(0 0 6px #ff3b1f); }
+.dmg.streak { font-size: 1.9rem; color: #ff7b00; text-shadow: 3px 0 0 #5a1a00, -3px 0 0 #5a1a00, 0 3px 0 #5a1a00, 0 -3px 0 #5a1a00; }
+.dmg.teamhit { color: #ff5d73; font-size: 1.2rem; }
+
+/* Maze: big timer + Edison Mode */
+.mz-side { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.mz-side .cboard { flex: 1; }
+.mz-timer-card { padding: 12px; text-align: center; }
+.mz-timer { font-family: var(--pixel); font-size: clamp(1.8rem, 3.2vw, 3rem); color: var(--gold); text-shadow: 4px 4px 0 var(--ink); margin: 6px 0; }
+.mz-timer.urgent { color: var(--bad); animation: blink .5s steps(2) infinite; }
+#mzTime { font-family: var(--pixel); font-size: 1.3rem; color: var(--gold); }
+.mz-board.edison { box-shadow: 0 0 0 4px #c77dff, 0 0 28px 6px rgba(167, 123, 255, .45); }
+.mz-board.zap { animation: zapFlash .5s steps(2) 2; }
+@keyframes zapFlash { 50% { filter: brightness(2.2) saturate(1.6); } }
+.mz-bolt { color: #ffe14d; font-size: clamp(15px, 2vw, 30px); text-shadow: 0 0 8px #ffd23f, 0 0 14px #ff9f1c; animation: bob .8s steps(2) infinite; z-index: 1; }
+.mz-hero.armed::after { content: '⚡'; position: absolute; right: -6px; top: 0; font-size: 14px; text-shadow: 0 0 6px #ffd23f; }

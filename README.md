@@ -13,7 +13,7 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 | **Boss Raid** | The class teams up. Correct answers attack the boss; fast answers hit harder. Beat the boss before the questions run out. |
 | **Four Corners Dash** | Each answer is a corner of the map. Students tap a corner and their hero runs there (they can switch until time's up). Wrong corners turn to lava. 3 hearts each; knocked-out heroes become ghosts who revive after 2 correct answers in a row. |
 | **Treasure Hunt** | A correct answer earns a dig. Diggers pick a spot on the island from their iPads to find gold, gems, chests… or a trap. Luck keeps it close. |
-| **Mr. C’s Maze** | Students steer their heroes with arrow buttons on their iPads. Locked gates need a correct answer (everyone unlocks their own). A wild Mr. C roams the maze: if he catches you, answer right to bonk him away or lose a heart. Escape for a big bonus. Everyone plays at their own pace; settings for maze size, time limit and number of Mr. C’s. |
+| **Mr. C’s Maze** | (Optional **⚡ Edison Mode**: purple maze with lightning bolts to zap the Mr. C’s.) Students steer their heroes with arrow buttons on their iPads. Locked gates need a correct answer (everyone unlocks their own). A wild Mr. C roams the maze: if he catches you, answer right to bonk him away or lose a heart. Escape for a big bonus. Everyone plays at their own pace; settings for maze size, time limit and number of Mr. C’s. |
 
 ## The pages
 
@@ -201,7 +201,20 @@ Until then, students can still play as guests.
 **What's stored about students:** their Google email, first name and last initial, their hero,
 coins and items. Nothing else. No passwords are ever seen by WiseRealm.
 
+## Running a class session
+
+- **Switch games without a new code:** after a game, click **Back to lobby (switch game)**. Pick a
+  different **Game** or **Question set** in the lobby; the room code and everyone who joined stay.
+  **Play again** restarts the same game right away.
+- **Auto-next** can be turned on/off during a game with the **⏩ Auto-next** button.
+- Guests can tap **Sign in to earn coins** on their waiting screen; they come straight back into the game.
+
 ## Boss Raid details
+
+- **Boss health:** Easy / Normal / Hard / Epic (lobby). **Boss attacks back** (on by default): after each
+  question the boss hits the team; more misses = bigger hit. **Team HP 0 = the boss wins.**
+- **STREAK CRIT:** 3+ right answers in a row deal double damage.
+
 
 - **Boss health** scales with the number of players and questions, so the class needs roughly
   65–70% correct to win.

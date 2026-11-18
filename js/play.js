@@ -59,6 +59,10 @@ async function loadAccount() {
         <button class="btn small" id="signOutBtn">Sign out</button>
       </div>`;
     $('#signOutBtn').onclick = async () => { await accounts.signOut(); location.reload(); };
+    // Came back from signing in during a game: rejoin it automatically.
+    let auto = null;
+    try { auto = sessionStorage.getItem('wr_autojoin'); sessionStorage.removeItem('wr_autojoin'); } catch { /* ignore */ }
+    if (auto && /^\d{5}$/.test(auto)) { $('#codeIn').value = auto; code = auto; connect(); }
   } catch (e) {
     console.warn(e);
     box.hidden = false;
@@ -295,6 +299,7 @@ function render(s) {
 }
 
 function showWait(title, sub) {
+  $('#waitSignIn').hidden = !!account;
   $('#waitHero').innerHTML = avatarSVG(profile.av);
   $('#waitName').textContent = profile.name;
   $('#waitTitle').textContent = title;
@@ -446,7 +451,7 @@ function mazeMsg(m) {
     mzToken = m.k;
     $('#dpad').hidden = true;
     $('#mzQ').hidden = false;
-    $('#mzKind').textContent = m.kind === 'fight' ? '⚔ MR. C ATTACKS! Answer to fight back!' : '🔒 LOCKED GATE: answer to open it';
+    $('#mzKind').textContent = m.kind === 'zap' ? '⚡ ZAP MR. C! Answer right to knock him out!' : m.kind === 'fight' ? '⚔ MR. C ATTACKS! Answer to fight back!' : '🔒 LOCKED GATE: answer to open it';
     $('#mzKind').className = 'kind ' + (m.kind === 'fight' ? 'fight' : '');
     $('#mzPrompt').textContent = m.q.prompt;
     $('#mzChoices').innerHTML = m.q.choices.map((c, i) =>
@@ -458,7 +463,7 @@ function mazeMsg(m) {
     $('#mzQ').hidden = true;
     $('#mzMsg').className = 'card mz-msg ' + (m.ok ? 'good' : 'bad');
     $('#mzMsg').textContent = m.line;
-    $('#mzHearts').textContent = '♥'.repeat(m.hp || 0) + '♡'.repeat(Math.max(0, 3 - (m.hp || 0)));
+    $('#mzHearts').textContent = '♥'.repeat(m.hp || 0) + '♡'.repeat(Math.max(0, 3 - (m.hp || 0))) + (m.bolts ? ' ⚡' + m.bolts : '');
     $('#mzScore').textContent = `${fmt(m.score || 0)} pts`;
     if (m.done) { mzDone = true; $('#dpad').hidden = true; setDir(null); }
     else $('#dpad').hidden = false;
@@ -470,6 +475,13 @@ $('#mzChoices').addEventListener('click', e => {
   document.querySelectorAll('#mzChoices .choice').forEach(x => (x.disabled = true));
   b.classList.add('picked');
 });
+
+// Guests can sign in from the waiting screen and come straight back into the game.
+$('#waitSignInBtn').onclick = () => {
+  try { sessionStorage.setItem('wr_autojoin', code); } catch { /* ignore */ }
+  const back = new URL('index.html', location.href); back.searchParams.set('join', code);
+  accounts.signIn(back.href).catch(e => alert(e.message));
+};
 
 // ---------------- iPad niceties ----------------
 let wakeLock = null;
