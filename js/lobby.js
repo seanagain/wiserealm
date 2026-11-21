@@ -49,6 +49,26 @@ const SHELF = pixels([
   'hhhhhhhhhh',
   'h........h',
 ], { h: '#5a3a24', r: '#ef476f', b: '#4cc9f0', g: '#3ddc84', y: '#ffd23f', p: '#c77dff' });
+// The book on a podium: students walk here to preview the questions on their iPads.
+const PODIUM = pixels([
+  '..hhhh..hhhh..',
+  '.hWWWWhhWWWWh.',
+  'hWkkWWWhWkkWWh',
+  'hWWWkkWhWWkkWh',
+  'hWkkWWWhWWkWWh',
+  '.hhhhhhrhhhhh.',
+  '..hTTTTrTTTh..',
+  '..hTTTTTTTTh..',
+  '...hBBBBBBh...',
+  '....hBBBBh....',
+  '....hBBBBh....',
+  '....hBDBBh....',
+  '....hBBBBh....',
+  '...hBBBBBBh...',
+  '..hBBBBBBBBh..',
+  '..hhhhhhhhhh..',
+], { h: '#1b1430', W: '#f4f1de', k: '#9a93b5', r: '#e63946', T: '#b0733f', B: '#8f5a2e', D: '#ffd23f' });
+const BOOK = { x: 0.935, y: 0.62 };
 const CLOCK = pixels([
   '.hhhh.',
   'hwwwwh',
@@ -58,7 +78,7 @@ const CLOCK = pixels([
   '.hhhh.',
 ], { h: '#1b1430', w: '#f4f1de', k: '#1b1430' });
 
-export function createPlayground(room, { players, heroHTML, teamOf = () => 0 }) {
+export function createPlayground(room, { players, heroHTML, teamOf = () => 0, onBook = () => {} }) {
   room.classList.add('classroom');
   room.innerHTML = `
     <div class="cr-wall">
@@ -73,6 +93,13 @@ export function createPlayground(room, { players, heroHTML, teamOf = () => 0 }) 
     ...DESKS.map(d => ({ ...d, html: DESK, cls: 'cr-desk' })),
     { x: 0.11, y: FLOOR_TOP + 0.06, html: TEACHER_DESK, cls: 'cr-tdesk' },
   ];
+  const podium = document.createElement('div');
+  podium.className = 'cr-prop cr-podium';
+  podium.innerHTML = `<div class="cr-podium-tag">📖 Preview</div>${PODIUM}`;
+  podium.style.left = BOOK.x * 100 + '%'; podium.style.top = BOOK.y * 100 + '%';
+  podium.style.zIndex = Math.round(BOOK.y * 1000);
+  layer.append(podium);
+  let bookOn = true;
   for (const pr of props) {
     const el = document.createElement('div');
     el.className = 'cr-prop ' + pr.cls;
@@ -149,6 +176,13 @@ export function createPlayground(room, { players, heroHTML, teamOf = () => 0 }) 
       s.x = Math.min(1 - halfW, Math.max(halfW, s.x + v[0] * speed * dt / W));
       s.y = Math.min(0.985, Math.max(minY, s.y + v[1] * speed * dt / H));
     }
+    // Walking up to the book sends the questions to that student's iPad.
+    for (const p of players()) {
+      const s = p.lb; if (!s) continue;
+      const near = bookOn && Math.hypot((s.x - BOOK.x) * W, (s.y - BOOK.y) * H) < size * 0.85;
+      if (near && !s.atBook && !p.bot) onBook(p);
+      s.atBook = near;
+    }
   }
 
   function draw() {
@@ -160,6 +194,7 @@ export function createPlayground(room, { players, heroHTML, teamOf = () => 0 }) 
       el.style.zIndex = Math.round(s.y * 1000) + 1;
       el.classList.toggle('walking', !!s.moving);
       el.classList.toggle('face-left', s.face < 0);
+      el.classList.toggle('reading', !!s.atBook);
     }
   }
 
@@ -174,5 +209,6 @@ export function createPlayground(room, { players, heroHTML, teamOf = () => 0 }) 
   function start() { if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(loop); } }
 
   addEventListener('resize', () => { measure(); draw(); });
-  return { sync, setDir, start };
+  function setBook(on) { bookOn = !!on; podium.hidden = !bookOn; }
+  return { sync, setDir, start, setBook };
 }

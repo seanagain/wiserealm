@@ -217,6 +217,11 @@ coins and items. Nothing else. No passwords are ever seen by WiseRealm.
 - **Auto-next** can be turned on/off during a game with the **⏩ Auto-next** button.
 - **Lobby playground:** while waiting, students walk their heroes around a pixel classroom on the
   projector with the arrow pad on their iPad, and send emotes. Click a hero to remove them.
+- **Lobby book 📖** (lobby setting, on by default): a book on a podium in the classroom. When a
+  student walks their hero up to it, their iPad shows a preview of this game's questions (the same
+  questions the game will ask, in a different order). Seeing the questions first helps memory.
+  **Show answers in book** (off by default) also marks the right answers; when it's off, answers
+  are never sent to the iPads at all.
 - **Require sign-in** (lobby setting): guests are turned away with a **Sign in** button that brings
   them back into the game.
 - **🔓 Room open / 🔒 Room locked** (above the playground): lock the room once everyone is in, so

@@ -135,6 +135,7 @@ function stateMsg() {
   if (mode.publicState) Object.assign(s, mode.publicState(ctx));
   s.hud = mode.hud ? mode.hud(ctx) : '';
   s.emotes = S.emotes !== false;
+  if (G.phase === 'lobby') s.book = S.book !== false;
   return s;
 }
 function broadcast() { send(stateMsg()); }
@@ -307,7 +308,23 @@ function refreshEmoteToggle() { $('#emoteToggle').textContent = S.emotes === fal
 function fail(msg) { $('#errMsg').textContent = msg; show('errScreen'); }
 
 // ---------------- Lobby ----------------
-const playground = createPlayground($('#roster'), { players: playerList, heroHTML, teamOf: p => (mode.lobbyTeam ? mode.lobbyTeam(ctx, p) : 0) });
+const playground = createPlayground($('#roster'), { players: playerList, heroHTML, teamOf: p => (mode.lobbyTeam ? mode.lobbyTeam(ctx, p) : 0), onBook: p => sendBook(p) });
+
+// ---- The lobby book: a preview of this game's questions (priming before the game) ----
+// The questions are picked now, so the book shows exactly what the game will ask
+// (in a different order). Answers are only sent if the teacher chose to show them.
+let bookQs = null;
+function prepBook() { bookQs = buildQuestions(set, { count: S.count, flip: S.flip }); }
+function sendBook(p) {
+  if (S.book === false || G.phase !== 'lobby' || !bookQs || !bookQs.length) return;
+  const now = performance.now();
+  if (p.bookAt && now - p.bookAt < 6000) return; // walked away and back: don't resend right away
+  p.bookAt = now;
+  const order = bookQs.map((q, i) => [Math.random(), i]).sort((a, b) => a[0] - b[0]).map(x => bookQs[x[1]]);
+  const show = !!S.bookAns;
+  send({ t: 'book', to: p.id, title: set.title, ans: show,
+    qs: order.slice(0, 60).map(q => Object.assign({ p: String(q.prompt).slice(0, 300), c: q.choices.map(c => String(c).slice(0, 200)) }, show ? { a: q.correct } : {})) });
+}
 function renderRoster() {
   $('#playerCount').textContent = playerList().length;
   playground.sync();
@@ -354,6 +371,7 @@ function applyChoice() {
   history.replaceState(null, '', `host.html?set=${encodeURIComponent(set.id)}&game=${mode.id}${params.has('debug') ? '&debug' : ''}`);
   refreshAutoToggle();
   if (G.phase === 'lobby') ctx.lobbyChanged(); // e.g. show or hide the team picker
+  prepBook();
 }
 
 function setupLobby() {
@@ -374,6 +392,7 @@ function setupLobby() {
     S.flip = $('#setFlip').checked; S.auto = $('#setAuto').checked;
     save('cq_host_settings', S);
     refreshAutoToggle();
+    prepBook();
   };
   ['#setTime', '#setCount', '#setFlip', '#setAuto'].forEach(s => $(s).addEventListener('change', persist));
   $('#setCoins').value = String(S.coinMult ?? 1);
@@ -384,6 +403,11 @@ function setupLobby() {
   $('#setEmotes').addEventListener('change', () => { S.emotes = $('#setEmotes').checked; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); });
   $('#emoteToggle').onclick = () => { S.emotes = S.emotes === false; save('cq_host_settings', S); refreshEmoteToggle(); broadcast(); };
   refreshEmoteToggle();
+  $('#setBook').checked = S.book !== false; $('#setBookAns').checked = !!S.bookAns;
+  const refreshBook = () => { $('#setBookAns').closest('label').hidden = S.book === false; playground.setBook(S.book !== false); };
+  $('#setBook').addEventListener('change', () => { S.book = $('#setBook').checked; save('cq_host_settings', S); refreshBook(); broadcast(); });
+  $('#setBookAns').addEventListener('change', () => { S.bookAns = $('#setBookAns').checked; save('cq_host_settings', S); });
+  refreshBook();
   // Auto-advance can also be switched during a game
   $('#autoToggle').onclick = () => {
     S.auto = !S.auto; save('cq_host_settings', S); $('#setAuto').checked = S.auto; refreshAutoToggle();
@@ -465,7 +489,8 @@ $('#openStudent').onclick = () => window.open(joinBase + 'index.html?join=' + co
 // ---------------- Game flow ----------------
 async function startGame() {
   if (!G.players.size) return alert('Wait for at least one student to join (or add test bots).');
-  const qs = buildQuestions(set, { count: S.count, flip: S.flip });
+  const qs = bookQs && bookQs.length ? bookQs : buildQuestions(set, { count: S.count, flip: S.flip });
+  bookQs = null;
   if (!qs.length) return alert('This set needs at least 2 questions with answers.');
   clearTimers();
   const flow = ++G.flow;
@@ -699,6 +724,7 @@ function backToLobby() {
   broadcast();
   show('lobbyScreen');
   refreshLooks();
+  prepBook();
 }
 $('#againBtn').onclick = backToLobby;
 $('#replayBtn').onclick = () => { backToLobby(); startGame(); };

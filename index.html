@@ -54,6 +54,7 @@
   <h2 style="margin:0" id="waitTitle">You’re in!</h2>
   <p class="muted" id="waitSub" style="font-size:1.15rem;margin:0">Look at the big screen. Your teacher will start soon.</p>
   <p class="good-note" id="waitClass" hidden></p>
+  <p class="book-hint" id="waitBook" hidden>📖 Walk your hero to the <b>book on the podium</b> to preview the questions!</p>
   <div class="card team-pick" id="teamPick" hidden>
     <b id="teamPickTitle">Pick your team!</b>
     <div class="flex" id="teamBtns"><button class="btn team-btn red" data-team="1">🟥 Red</button><button class="btn team-btn blue" data-team="2">🟦 Blue</button></div>
@@ -136,6 +137,13 @@
   <button class="btn primary" id="msgBtn">OK</button>
 </section>
 
+<div class="book-view" id="bookView" hidden>
+  <div class="book-card">
+    <div class="book-head"><b id="bookTitle">📖 Preview</b><button class="btn small primary" id="bookClose">Close ✕</button></div>
+    <p class="muted" id="bookNote" style="margin:0"></p>
+    <ol class="book-list" id="bookList"></ol>
+  </div>
+</div>
 <div class="emote-bar" id="emoteBar" hidden></div>
 <script type="module" src="js/play.js"></script>
 </body>

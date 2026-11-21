@@ -227,6 +227,8 @@ function onMsg(m) {
     }
   } else if (m.t === 'mq' || m.t === 'mres') {
     if (joined) mazeMsg(m);
+  } else if (m.t === 'book') {
+    if (joined && last && last.phase === 'lobby') openBook(m);
   } else if (m.t === 'tmap' || m.t === 'tt') {
     if (joined) terPad.onMsg(m);
   } else if (m.t === 'reg') {
@@ -295,6 +297,8 @@ function render(s) {
   renderEmoteBar(s);
   const key = s.phase + ':' + s.qi;
   document.querySelectorAll('.score-label').forEach(el => (el.textContent = s.scoreName || 'Score'));
+  if (s.phase !== 'lobby') $('#bookView').hidden = true;
+  $('#waitBook').hidden = !(s.phase === 'lobby' && s.book);
   if (s.phase === 'lobby' || s.phase === 'intro') {
     myAns = -1; myPick = -1;
     renderTeamPick(s);
@@ -344,6 +348,19 @@ function render(s) {
     renderEnd(s);
   }
 }
+
+// The lobby book: a preview of the game's questions (sent when the hero walks to the podium).
+function openBook(m) {
+  if (!Array.isArray(m.qs)) return;
+  setDir(null);
+  $('#bookTitle').textContent = `📖 ${String(m.title || 'Preview').slice(0, 80)}`;
+  $('#bookNote').textContent = m.ans ? 'Read the questions and answers. They’ll be in the game!' : 'Read the questions now. They’ll be in the game! (Answers are hidden: think about what they might be.)';
+  $('#bookList').innerHTML = m.qs.map(q => `<li><div class="bq">${esc(q.p)}</div><div class="bc">${(q.c || []).map((c, i) =>
+    `<span class="${q.a === i ? 'right' : ''}">${q.a === i ? '✓ ' : ''}${esc(c)}</span>`).join('')}</div></li>`).join('');
+  $('#bookView').hidden = false;
+  $('#bookList').scrollTop = 0;
+}
+$('#bookClose').onclick = () => { $('#bookView').hidden = true; };
 
 // Territory Battle: pick a team in the lobby (when the teacher allows it).
 function renderTeamPick(s) {
@@ -528,7 +545,7 @@ for (const dpad of document.querySelectorAll('.dpad')) {
   dpad.addEventListener('contextmenu', e => e.preventDefault());
 }
 const KEYS = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', w: 'u', s: 'd', a: 'l', d: 'r' };
-const padActive = () => ($('#s-maze').classList.contains('active') && !$('#dpad').hidden) || ($('#s-wait').classList.contains('active') && !$('#lobbyPad').hidden);
+const padActive = () => ($('#s-maze').classList.contains('active') && !$('#dpad').hidden) || ($('#s-wait').classList.contains('active') && !$('#lobbyPad').hidden && $('#bookView').hidden);
 document.addEventListener('keydown', e => { if (padActive() && KEYS[e.key]) { e.preventDefault(); setDir(KEYS[e.key]); } });
 document.addEventListener('keyup', e => { if (KEYS[e.key] && KEYS[e.key] === mzDir) setDir(null); });
 
