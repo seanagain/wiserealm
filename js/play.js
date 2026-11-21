@@ -410,7 +410,8 @@ function renderQuestion(s) {
   $('#qPrompt').textContent = s.q.prompt;
   $('#pChoices').innerHTML = s.q.choices.map((c, i) =>
     `<button class="choice ${CHOICE_STYLE[i].cls} ${i === myPick ? 'picked' : ''}" data-c="${i}"><span class="ico">${CHOICE_STYLE[i].icon}</span><span>${esc(c)}</span></button>`).join('') +
-    (s.change ? `<div class="pick-note" id="pickNote" style="grid-column:1/-1">${myPick >= 0 ? 'Running there! You can switch until time runs out.' : 'Tap a corner to run there!'}</div>` : '');
+    (s.change ? `<div class="pick-note" id="pickNote" style="grid-column:1/-1"></div>` : '');
+  if (s.change) pickNote(s);
   show('s-question');
   startTimer('#tBar', '#s-question');
 }
@@ -422,9 +423,10 @@ $('#pChoices').addEventListener('click', e => {
   if (last.change) {
     if (c === myPick) return;
     myPick = c;
+    if (!firstPick || firstPick.qi !== last.qi) firstPick = { qi: last.qi, c, early: deadline - performance.now() >= limit * 0.5 };
     toHost({ t: 'ans', id: pid, q: last.qi, c });
     document.querySelectorAll('#pChoices .choice').forEach(el => el.classList.toggle('picked', +el.dataset.c === c));
-    const note = $('#pickNote'); if (note) note.textContent = 'Running there! You can switch until time runs out.';
+    pickNote(last);
     return;
   }
   if (myAns === last.qi) return;
@@ -433,6 +435,19 @@ $('#pChoices').addEventListener('click', e => {
   shownKey = last.phase + ':' + last.qi + ':locked';
   showLocked();
 });
+
+// Four Corners: what the student needs to know about the Lone Wolf bonus.
+let firstPick = null; // { qi, c, early }
+function pickNote(s) {
+  const note = $('#pickNote'); if (!note) return;
+  const fp = firstPick && firstPick.qi === s.qi ? firstPick : null;
+  if (!s.lone) { note.textContent = myPick >= 0 ? 'Running there! You can switch until time runs out.' : 'Tap a corner to run there!'; return; }
+  note.textContent = myPick < 0 ? 'Tap a corner! 🐺 Choose on your own in the first half and stay there: right with few others = bonus!'
+    : !fp ? 'Running there! You can switch until time runs out.'
+    : fp.c !== myPick ? 'You switched corners: no 🐺 bonus this round.'
+    : !fp.early ? 'Running there! (Picked after half time: no 🐺 bonus this round.)'
+    : '🔒 Locked in for the 🐺 bonus! Stay here to keep it.';
+}
 
 function showLocked() {
   $('#lockHero').innerHTML = avatarSVG(profile.av);

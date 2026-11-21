@@ -12,6 +12,13 @@ const LAYOUTS = {
 };
 const SPAWN = { x: 40, y: 28, w: 20, h: 44 };
 
+// Lone Wolf bonus: rewards thinking for yourself instead of following the crowd.
+// Only counts if you picked in the first half of the time and never switched corners,
+// so jumping to an empty corner at the last second doesn't work.
+const LONE = 100, BOLD = 40;
+const loneOn = ctx => ctx.S.loneBonus !== false;
+const secretOn = ctx => !!ctx.S.secretCorners;
+
 const alive = p => p.m.hearts > 0;
 const heartsText = p => (alive(p) ? '♥'.repeat(p.m.hearts) + '♡'.repeat(HEARTS - p.m.hearts) : 'GHOST');
 
@@ -33,15 +40,19 @@ function slots(rect, n) {
   return out;
 }
 
-function layout(ctx) {
+function layout(ctx, reveal = false) {
   const { G, heroEls } = ctx;
+  // Secret corners: everyone waits in the middle until time is up, so there's no one to follow.
+  const hide = secretOn(ctx) && G.phase === 'question' && !reveal;
   const q = G.qs[G.qi];
   const zones = q ? LAYOUTS[q.choices.length] || LAYOUTS[4] : [];
   const groups = new Map();
   for (const p of ctx.players()) {
     ensure(p);
     const a = G.phase === 'question' || G.phase === 'reveal' ? G.answers.get(p.id) : null;
-    const key = a ? a.c : -1;
+    const key = a && !hide ? a.c : -1;
+    const el = heroEls.get(p.id);
+    if (el) el.classList.toggle('picked', !!a && hide);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(p);
   }
@@ -103,6 +114,19 @@ export default {
   allowChange: true,
   showChoices: false,
 
+  settings(ctx, el, persist) {
+    const { S } = ctx;
+    el.innerHTML = `<label title="Bonus for a right answer with few or no other players in your corner. Only if you picked in the first half of the time and never switched.">🐺 Lone Wolf bonus <input type="checkbox" id="cLone"></label>
+      <p class="muted" style="margin:-6px 0 0;font-size:.82rem">Right and alone: +${LONE}. Right with only a few others: +${BOLD}. Must pick in the first half and stay put.</p>
+      <label title="Heroes wait in the middle until time is up, so students can't follow each other">Secret corners <input type="checkbox" id="cSecret"></label>
+      <p class="muted" style="margin:-6px 0 0;font-size:.82rem">Hides where everyone is running until time’s up.</p>`;
+    const lone = el.querySelector('#cLone'), sec = el.querySelector('#cSecret');
+    lone.checked = loneOn(ctx); sec.checked = secretOn(ctx);
+    lone.onchange = () => { S.loneBonus = lone.checked; persist(); };
+    sec.onchange = () => { S.secretCorners = sec.checked; persist(); };
+  },
+  publicState(ctx) { return { lone: loneOn(ctx), secret: secretOn(ctx) }; },
+
   mount(ctx) {
     ctx.stage.innerHTML = `<div class="cwrap"><div class="cmap" id="cmap"><div class="spawn" style="left:${SPAWN.x}%;top:${SPAWN.y}%;width:${SPAWN.w}%;height:${SPAWN.h}%"></div><div id="zones"></div></div>
       <div class="card cboard" id="cboard"></div></div>`;
@@ -132,12 +156,20 @@ export default {
     layout(ctx);
   },
 
-  onAnswer(ctx) { layout(ctx); },
+  onAnswer(ctx, p, c) {
+    const { G } = ctx, frac = (performance.now() - G.qStart) / G.limit;
+    if (!p.m.pick || p.m.pick.qi !== G.qi) p.m.pick = { qi: G.qi, c, early: frac <= 0.5, switched: false };
+    else if (c !== p.m.pick.c) p.m.pick.switched = true;
+    layout(ctx);
+  },
 
   reveal(ctx, q, results) {
     const { $$, heroEls, fmt, later, sfx, floatText, $ } = ctx;
     const res = {};
     let safe = 0, knocked = 0, revived = 0;
+    layout(ctx, true); // secret corners: everyone runs to their corner now
+    const inCorner = q.choices.map((_, i) => results.filter(r => r.a && r.a.c === i).length);
+    const total = results.length, wolves = [];
     $$('#zones .zone').forEach((z, i) => z.classList.add(i === q.correct ? 'safe' : 'lava'));
     sfx('roar');
     for (const r of results) {
@@ -148,12 +180,20 @@ export default {
         safe++;
         pts = alive(p) ? 100 + Math.round(100 * (1 - r.frac)) : 50;
         if (p.streak >= 3) pts = Math.round(pts * 1.25);
+        let bonus = '';
+        const pk = p.m.pick;
+        if (loneOn(ctx) && pk && pk.qi === ctx.G.qi && pk.early && !pk.switched && a) {
+          const n = inCorner[a.c];
+          if (n === 1 && total >= 4) { pts += LONE; bonus = ` 🐺 Lone Wolf +${LONE}!`; wolves.push(p.name); }
+          else if (n >= 2 && total >= 8 && n <= Math.floor(total / 4)) { pts += BOLD; bonus = ` 🦊 Bold pick +${BOLD}!`; }
+        }
         p.score += pts;
         if (!alive(p)) {
           p.m.ghostStreak++;
           if (p.m.ghostStreak >= 2) { p.m.hearts = 1; p.m.ghostStreak = 0; revived++; line = `Revived! +${fmt(pts)} points`; }
           else line = `+${fmt(pts)} points. One more correct to revive!`;
         } else line = `Safe! +${fmt(pts)} points`;
+        line += bonus;
       } else {
         p.m.ghostStreak = 0;
         if (alive(p)) {
@@ -168,7 +208,8 @@ export default {
         later(() => {
           el.classList.remove('jump', 'hurt'); void el.offsetWidth;
           el.classList.add(r.correct ? 'jump' : 'hurt');
-          if (pts) floatText($('#cmap'), '+' + fmt(pts), r.frac < 0.25 ? 'crit' : '', parseFloat(el.style.left), parseFloat(el.style.top) - 8);
+          const wolf = wolves.includes(p.name);
+          if (pts) floatText($('#cmap'), (wolf ? '🐺 ' : '') + '+' + fmt(pts), r.frac < 0.25 || wolf ? 'crit' : '', parseFloat(el.style.left), parseFloat(el.style.top) - 8);
           updateHero(ctx, p);
           if (!r.correct) sfx('hit');
         }, 500 + Math.random() * 500);
@@ -177,7 +218,8 @@ export default {
     if (revived) later(() => sfx('heal'), 1200);
     later(() => renderBoard(ctx), 1300);
     ctx.setRoundMsg(`<span class="good">${safe} safe</span> · <span class="bad">${results.length - safe} in the lava</span>` +
-      (knocked ? ` · ${knocked} knocked out` : '') + (revived ? ` · <span class="good">${revived} revived!</span>` : ''));
+      (knocked ? ` · ${knocked} knocked out` : '') + (revived ? ` · <span class="good">${revived} revived!</span>` : '') +
+      (wolves.length ? ` · <span style="color:var(--gold)">🐺 Lone Wolf: ${wolves.map(ctx.esc).join(', ')}</span>` : ''));
     const still = ctx.players().filter(alive).length;
     return { res, note: `${still} heroes still standing`, duration: 2300 };
   },
