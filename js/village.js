@@ -4,39 +4,42 @@
 import { $, esc } from './common.js';
 import { accounts } from './supa.js';
 import { avatarSVG } from './avatar.js';
-import { roomSVG, houseSVG, DEFAULT_HOUSE } from './furniture.js';
+import { roomSVG, DEFAULT_HOUSE } from './furniture.js';
+import { buildVillage, paintVillage } from './villagemap.js';
 
 let classes = [], current = null, data = null;
 
-// Spots for future neighborhood buildings (mini games, enrichment...).
+// Plots saved for future buildings (mini games, enrichment...).
 const COMING = [
   { ic: '📚', name: 'Library' },
   { ic: '🕹️', name: 'Arcade' },
   { ic: '🏛️', name: 'Museum' },
 ];
 
-function plot(h, i, teacher = false) {
-  const ext = h.house && Number.isInteger(h.house.ext) ? h.house.ext : 0;
-  return `<button class="plot ${teacher ? 'teacher' : ''} ${h.me ? 'me' : ''}" data-i="${i}" title="Visit ${esc(h.name)}'s house">
-    <div class="plot-house">${houseSVG(ext, teacher)}</div>
-    <div class="plot-hero">${avatarSVG(h.avatar || {})}</div>
-    <div class="plot-name">${teacher ? '🍎 ' : ''}${esc(h.name)}${h.me ? ' (you)' : ''}</div>
-  </button>`;
-}
+const pc = (v, n, of) => (100 * n) / of + '%';
+function box(v, b) { return `left:${pc(v, b.x, v.W)};top:${pc(v, b.y, v.H)};width:${pc(v, b.w, v.W)};height:${pc(v, b.h, v.H)}`; }
 
 function render() {
   $('#classTabs').innerHTML = classes.length > 1
     ? classes.map(c => `<button class="btn ${c.id === current ? 'sel' : ''}" data-class="${esc(c.id)}">${esc(c.name)}</button>`).join('') : '';
-  const v = $('#village');
-  if (!data) { v.innerHTML = '<p class="muted" style="padding:20px">Loading the village…</p>'; return; }
+  const el = $('#village');
+  if (!data) { el.innerHTML = '<p class="muted" style="padding:20px">Loading the village…</p>'; return; }
   const kids = data.houses;
-  v.innerHTML = `
-    <div class="village-sign">🏘 ${esc(data.name)} Village</div>
-    <div class="village-top">${data.teacher ? plot(data.teacher, -1, true) : ''}</div>
-    <div class="village-road"></div>
-    <div class="village-grid">${kids.map((h, i) => plot(h, i)).join('') || '<p class="muted">No classmates yet. Houses appear here as students join the class.</p>'}</div>
-    <div class="village-road"></div>
-    <div class="village-grid coming">${COMING.map(c => `<div class="lot"><div class="lot-sign">${c.ic}<br>${esc(c.name)}<br><small>Coming soon</small></div></div>`).join('')}</div>`;
+  const v = buildVillage(kids.length, current, kids.map(h => (h.house && Number.isInteger(h.house.ext) ? h.house.ext : 0)));
+  el.innerHTML = `
+    <div class="village-banner"><span>🏰 ${esc(data.name)} Village</span></div>
+    <div class="vmap" style="aspect-ratio:${v.W} / ${v.H}">
+      <canvas id="vcanvas"></canvas>
+      <div class="vlayer">
+        ${data.teacher ? `<button class="vplot castle ${data.teacher.me ? 'me' : ''}" data-i="-1" style="${box(v, v.castle)}" title="Visit the castle">
+          <span class="vname lord">👑 ${esc(data.teacher.name)}</span></button>` : ''}
+        ${kids.map((h, i) => { const b = v.houses[i]; return `<button class="vplot ${h.me ? 'me' : ''}" data-i="${i}" style="${box(v, b)}" title="Visit ${esc(h.name)}'s house">
+          <span class="vhero">${avatarSVG(h.avatar || {})}</span><span class="vname">${esc(h.name)}${h.me ? ' ★' : ''}</span></button>`; }).join('')}
+        ${v.lots.map((l, i) => `<div class="vlot" style="${box(v, l)}"><span>${COMING[i].ic} ${esc(COMING[i].name)}<br><small>Coming soon</small></span></div>`).join('')}
+      </div>
+    </div>
+    ${kids.length ? '' : '<p class="muted" style="text-align:center">No villagers yet. A cottage appears here for each student who joins the class.</p>'}`;
+  paintVillage($('#vcanvas'), v);
 }
 
 async function open(id) {
@@ -49,9 +52,9 @@ async function open(id) {
 
 $('#classTabs').addEventListener('click', e => { const b = e.target.closest('[data-class]'); if (b) open(b.dataset.class); });
 $('#village').addEventListener('click', e => {
-  const b = e.target.closest('.plot'); if (!b || !data) return;
+  const b = e.target.closest('.vplot'); if (!b || !data) return;
   const i = +b.dataset.i, h = i < 0 ? data.teacher : data.houses[i];
-  $('#visitTitle').textContent = `${i < 0 ? '🍎 ' : '🏠 '}${h.name}’s house`;
+  $('#visitTitle').textContent = i < 0 ? `🏰 ${h.name}’s castle` : `🏠 ${h.name}’s cottage`;
   $('#visitRoom').innerHTML = roomSVG(h.house || DEFAULT_HOUSE);
   $('#visitNote').innerHTML = h.me ? '<a class="btn small primary" href="house.html">🏠 Decorate my house</a>' : (h.house ? '' : 'They haven’t decorated yet. This is the starter room.');
   $('#visit').showModal();

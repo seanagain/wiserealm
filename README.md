@@ -43,7 +43,10 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 
 - Every signed-in student has **one house**. It shows up in the village of **every class** they're
   in. The village is built from the class list each time it opens, so houses appear and disappear
-  as students join or leave the class. Your (the teacher's) house stands in the middle.
+  as students join or leave the class. It's a medieval village drawn as one pixel-art map: your (the
+  teacher's) castle on the hill, a river with a stone bridge, a cobblestone high street with a
+  timber-framed cottage for each student, a pond, a well, and forest all around. Each class always
+  gets the same scenery.
 - **Only classmates in the same class** (and that class's teacher) can visit. They see the in-game
   name, hero and house. There are no messages or reactions.
 - **Furniture:** a few free starter pieces, more in the **Store** (25–400 coins), wallpapers and
@@ -57,7 +60,7 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 - The database checks every save: only furniture the student owns or unlocked, inside the room.
 - **Supabase usage:** houses don't use live messages at all. A house is about 1–3 KB in the
   database; opening a village of 30 houses downloads about 100 KB.
-- The empty plots ("Coming soon") are saved for future buildings like a library or arcade.
+- The fenced plots ("Coming soon") are saved for future buildings like a library or arcade.
 
 ## Classes and progress
 
@@ -323,6 +326,8 @@ js/me.js               student profile page
 js/furniture.js        house furniture (pixel art), milestones, drawing rooms and houses
 js/house.js            decorate my house (house.html)
 js/village.js          the class village (village.html)
+js/villagemap.js       lays out and paints the village map (forest, river, roads, houses)
+js/village-art.js      medieval pixel art: cottages, the castle, trees, well...
 js/classes.js          teacher classes & progress dashboard
 js/charts.js           small progress charts
 js/practice.js         practice hub (practice.html)

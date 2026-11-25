@@ -96,7 +96,7 @@ function renderPanel() {
       : buyBtn(it))).join('')}</div>`;
     p.innerHTML = `<h3 style="margin-top:0">Wallpaper</h3>${pats(WALLS, 'wall')}<h3>Floor</h3>${pats(FLOORS, 'floor')}`;
   } else if (tab === 'outside') {
-    p.innerHTML = `<p class="muted" style="margin-top:0">How your house looks in the class village. All colors are free!</p>
+    p.innerHTML = `<p class="muted" style="margin-top:0">Your cottage’s roof in the class village. All of them are free!</p>
       <div class="hitems">${EXTERIORS.map((_, i) => `<button class="hitem ext ${draft.ext === i ? 'sel' : ''}" data-ext="${i}"><div class="pic">${houseSVG(i)}</div></button>`).join('')}</div>`;
   } else {
     p.innerHTML = `<p class="muted" style="margin-top:0">Special furniture you can’t buy: earn it by learning!</p>

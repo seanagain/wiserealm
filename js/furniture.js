@@ -7,6 +7,7 @@
 // wall furniture hangs on the wall rows. A house is saved as
 //   { wall, floor, ext, items: [[id, x, y, flip], ...] }
 import { makeGrid, gridRects, avatarSVG } from './avatar.js';
+import { EXTERIORS, houseGrid, castleGrid } from './village-art.js';
 
 export const ROOM_W = 12, ROOM_H = 9, WALL_ROWS = 3, TILE = 8, MAX_ITEMS = 40, MAX_COPIES = 4;
 
@@ -128,11 +129,8 @@ export const HOUSE_ITEMS = [...FURNITURE, ...WALLS, ...FLOORS];
 export const HOUSE_BY_ID = Object.fromEntries(HOUSE_ITEMS.map(i => [i.id, i]));
 export const isFreeFurn = it => it && it.price === 0 && !it.milestone;
 
-// Outside colors of a house: [roof, roof edge, walls, door]
-export const EXTERIORS = [
-  ['#e63946', '#a4283a', '#f4f1de', '#8f5a2e'], ['#4361ee', '#2c3fae', '#fff6c2', '#c0283f'], ['#2a9d5c', '#1d6e40', '#f4e3c3', '#5a3a24'],
-  ['#8e44ad', '#5b2c6f', '#e8f0ff', '#ffd23f'], ['#ff7b00', '#c45c00', '#fdf0d5', '#2b2b36'], ['#34344a', '#1b1b28', '#c9e4f7', '#e76f51'],
-];
+// Outside looks of a house (cottage roof colors). The art is in village-art.js.
+export { EXTERIORS };
 
 export const DEFAULT_HOUSE = { wall: 'w_plain', floor: 'fl_wood', ext: 0, items: [['f_bed', 1, 4, 0], ['f_rug', 5, 6, 0], ['f_table', 6, 5, 0], ['f_chair', 5, 5, 0]] };
 
@@ -230,29 +228,10 @@ export function itemSVG(it) {
   return `<svg viewBox="0 0 ${s} ${s}" shape-rendering="crispEdges">${gridRects(g)}</svg>`;
 }
 
-// The outside of a house (28 x 26 pixels). big = the teacher's house, with a flag and a bell.
+// The outside of a house: a cottage, or the castle for the teacher.
 export function houseSVG(ext = 0, big = false) {
-  const [roof, edge, wallc, door] = EXTERIORS[ext] || EXTERIORS[0];
-  const W = 28, H = 26, g = makeGrid(W, H + (big ? 8 : 0)), o = big ? 8 : 0;
-  const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (g[y + o] && x >= 0 && x < W) g[y + o][x] = c; };
-  // walls, door, windows
-  rect(1, 9, 26, 24, K); rect(2, 10, 25, 24, wallc);
-  rect(11, 15, 16, 24, K); rect(12, 16, 15, 24, door); g[20 + o][14] = '#ffd23f';
-  for (const wx of [3, 19]) { rect(wx, 12, wx + 5, 17, K); rect(wx + 1, 13, wx + 4, 16, '#8fd8ff'); rect(wx + 3, 13, wx + 3, 16, K); rect(wx + 1, 15, wx + 4, 15, K); g[13 + o][wx + 1] = '#ffffff'; }
-  rect(0, 25, 27, 25, '#5a8f3c');
-  // roof
-  for (let r = 0; r <= 8; r++) {
-    const half = Math.min(14, 1 + Math.floor(r * 1.6)), x0 = 14 - half, x1 = 13 + half;
-    rect(x0, r, x1, r, r === 0 ? K : roof);
-    rect(x0, r, x0, r, K); rect(x1, r, x1, r, K);
-    if (r % 3 === 2) rect(x0 + 2, r, x1 - 2, r, edge); // shingle lines
-  }
-  rect(0, 9, 27, 9, edge); rect(0, 10, 27, 10, K);
-  if (big) { // bell tower + flag for the teacher's house
-    rect(11, -6, 16, 1, K); rect(12, -5, 15, 1, wallc); rect(13, -3, 14, -1, '#ffd23f');
-    rect(13, -8, 13, -6, K); rect(14, -8, 17, -7, '#e63946');
-  }
-  return `<svg class="house-svg" viewBox="0 0 ${W} ${H + o}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${gridRects(g)}</svg>`;
+  const g = big ? castleGrid(ext) : houseGrid(ext);
+  return `<svg class="house-svg" viewBox="0 0 ${g[0].length} ${g.length}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${gridRects(g)}</svg>`;
 }
 
 export { avatarSVG };
