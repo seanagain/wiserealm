@@ -307,6 +307,8 @@ function tick(ctx, now) {
 
 export default {
   id: 'ctf',
+  // How it rates in the game picker (1-5): learning focus vs. fun gameplay.
+  rating: { learn: 2, fun: 5, why: 'Questions mostly come when tagged or in jail, so some students answer far fewer than others. Very exciting.' },
   name: 'Capture the Flag',
   blurb: 'Red vs Blue! Sneak onto the other side, grab their flag and run it home. Get tagged on their side and you must answer: wrong means jail. In jail, answer 3 right to escape, or wait for a jailbreak.',
   scoreName: 'Points',

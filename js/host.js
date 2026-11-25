@@ -372,10 +372,16 @@ function chooseGame(id) {
   mode = MODES[id]; G.extra = {}; G.voteWinner = null;
   applyChoice(); broadcast();
 }
+const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+// Two ratings for each game, so teachers can pick for learning or for fun.
+const ratingHTML = m => m.rating ? `<div class="gp-rate" title="${esc(m.blurb || '')}">
+    <div><span>📚 Learning</span><b class="st">${stars(m.rating.learn)}</b></div>
+    <div><span>🎮 Gameplay</span><b class="st fun">${stars(m.rating.fun)}</b></div>
+    <div class="why">${esc(m.rating.why)}</div></div>` : '';
 const voteOut = new Set(load('cq_vote_out', []));
 function openGamePick() {
   $('#gpGrid').innerHTML = Object.values(MODES).map(m => `<div class="gp-card ${m.id === mode.id ? 'sel' : ''}" data-g="${m.id}" tabindex="0">
-      <div class="ga">${gameArt(m.id)}</div><b>${esc(m.name)}</b><p class="muted">${esc(m.blurb || '')}</p>
+      <div class="ga">${gameArt(m.id)}</div><b>${esc(m.name)}</b>${ratingHTML(m)}
       <label class="gp-in"><input type="checkbox" data-in="${m.id}" ${voteOut.has(m.id) ? '' : 'checked'}> In the vote</label></div>`).join('');
   $('#gamePick').showModal();
 }

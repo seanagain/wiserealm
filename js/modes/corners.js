@@ -107,6 +107,8 @@ function renderBoard(ctx) {
 
 export default {
   id: 'corners',
+  // How it rates in the game picker (1-5): learning focus vs. fun gameplay.
+  rating: { learn: 5, fun: 4, why: 'Everyone answers every question, with the answer shown each time. Turn on Secret corners to stop copying.' },
   name: 'Four Corners Dash',
   blurb: 'Run to the corner with the right answer! Wrong corners turn to lava. 3 hearts each; ghosts can revive.',
   scoreName: 'Points',

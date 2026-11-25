@@ -377,6 +377,8 @@ function botThink(ctx, p) {
 
 export default {
   id: 'territory',
+  // How it rates in the game picker (1-5): learning focus vs. fun gameplay.
+  rating: { learn: 3, fun: 5, why: 'Questions refill ink and settle duels: frequent, but mixed with lots of running and team strategy.' },
   name: 'Territory Battle',
   blurb: 'Two teams paint the map with the arrows on their iPads! Run out of ink? Answer to refill. Bump into an enemy and you both get the same question: first right answer wins the duel. Most territory wins!',
   scoreName: 'Points',

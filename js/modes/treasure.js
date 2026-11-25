@@ -67,6 +67,8 @@ function dig(ctx, p, idx) {
 
 export default {
   id: 'treasure',
+  // How it rates in the game picker (1-5): learning focus vs. fun gameplay.
+  rating: { learn: 4, fun: 3, why: 'Everyone answers every question; right answers earn digs. Luck keeps it close, so slower students stay in it.' },
   name: 'Treasure Hunt',
   blurb: 'Answer right to earn a dig! Pick a spot on the island to find gold, gems and chests. Watch out for traps!',
   scoreName: 'Gold',

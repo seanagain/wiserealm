@@ -372,6 +372,8 @@ function checkCatch(ctx, now) {
 
 export default {
   id: 'maze',
+  // How it rates in the game picker (1-5): learning focus vs. fun gameplay.
+  rating: { learn: 3, fun: 4, why: 'Questions come at gates and when Mr. C attacks, so there is more walking than answering.' },
   name: 'Mr. C’s Maze',
   blurb: 'Steer your hero with the arrows on your iPad! Answer questions to unlock gates, and bonk the wild Mr. C before he gets you. Escape for a big bonus.',
   scoreName: 'Points',

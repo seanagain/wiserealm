@@ -155,6 +155,8 @@ function lapDone(ctx, p) {
 
 export default {
   id: 'kart',
+  // How it rates in the game picker (1-5): learning focus vs. fun gameplay.
+  rating: { learn: 2, fun: 5, why: 'One question per lap plus banana slips: lots of fast fun, fewer questions per minute.' },
   name: 'Quiz Kart Rally',
   blurb: 'Race karts around the track! Each lap starts with a quiz gate: right answers give a turbo boost. Grab item boxes for turbos and banana peels; slip on a peel and you must answer to drive on.',
   scoreName: 'Points',

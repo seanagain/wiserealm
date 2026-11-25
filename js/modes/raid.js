@@ -117,6 +117,8 @@ function animateAttacks(ctx, hits) {
 
 export default {
   id: 'raid',
+  // How it rates in the game picker (1-5): learning focus vs. fun gameplay.
+  rating: { learn: 5, fun: 3, why: 'Everyone answers every question together, and the answer is shown after each one: great for review.' },
   name: 'Boss Raid',
   blurb: 'Team up! Every correct answer attacks the boss. Fast answers hit harder.',
   scoreName: 'Damage',

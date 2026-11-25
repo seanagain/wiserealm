@@ -256,7 +256,9 @@ coins and items. Nothing else. No passwords are ever seen by WiseRealm.
 - **Lobby playground:** while waiting, students walk their heroes around a pixel classroom on the
   projector with the arrow pad on their iPad, and send emotes. Click a hero to remove them.
 - **🎮 Choose a game:** the **Change** button in the lobby opens a grid of all the games with a
-  picture of each. **🗳 Let students vote** puts the games (untick any you want to leave out) on
+  picture of each. Each game shows two ratings: **📚 Learning** (how many questions every student
+  answers) and **🎮 Gameplay** (how much running and excitement), with a one-line reason. Pick a
+  high-Learning game for review, or a high-Gameplay game for fun practice. **🗳 Let students vote** puts the games (untick any you want to leave out) on
   every iPad for 20 seconds; the projector shows live bars, and the winner is picked automatically
   (a tie is a coin flip). Press **Start game!** when you're ready.
 - **👥 Player list** (above the classroom): everyone in the game, signed in or guest, with a Remove
