@@ -25,6 +25,8 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 | `index.html` | Students join games here (wiserealm.org). |
 | `shop.html` | Students design their hero and buy items with coins. |
 | `me.html` | Students' profile: join a class, see their stats, progress chart and badges. |
+| `house.html` | Students decorate their own pixel house with furniture (teachers too). |
+| `village.html` | The class village: a house for everyone in the class. Tap a house to look inside. |
 
 ## Coins and the shop
 
@@ -36,6 +38,26 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
   anything on before buying. Prices live in the database, so they can't be changed from a browser.
 - On **Students & coins** you can give bonus coins (or take some away with a minus number).
 - Guests can still play every game; they just don't earn coins.
+
+## Houses and the class village
+
+- Every signed-in student has **one house**. It shows up in the village of **every class** they're
+  in. The village is built from the class list each time it opens, so houses appear and disappear
+  as students join or leave the class. Your (the teacher's) house stands in the middle.
+- **Only classmates in the same class** (and that class's teacher) can visit. They see the in-game
+  name, hero and house. There are no messages or reactions.
+- **Furniture:** a few free starter pieces, more in the **Store** (25–400 coins), wallpapers and
+  floors, and 6 free house colors. Up to 4 of each piece, 40 things per house.
+- **Milestone furniture** can't be bought, only earned by learning: join a class (Welcome Mat),
+  play 1 / 10 / 25 games (Bronze / Silver / Gold Trophy), 100 right answers (Telescope), 10 practice
+  sessions (Study Desk), a 5-day practice streak (Streak Torch), master 20 / 75 practice questions
+  (Bookshelf of Wisdom / Giant Globe). Once earned, they stay unlocked.
+- Teachers can decorate with any furniture (to show students what's possible), open each class's
+  village from the class page (**🏘 Village**), and **🏠 Reset house** from a student's details.
+- The database checks every save: only furniture the student owns or unlocked, inside the room.
+- **Supabase usage:** houses don't use live messages at all. A house is about 1–3 KB in the
+  database; opening a village of 30 houses downloads about 100 KB.
+- The empty plots ("Coming soon") are saved for future buildings like a library or arcade.
 
 ## Classes and progress
 
@@ -298,6 +320,9 @@ js/terpad.js           Territory Battle map on the student iPad
 js/play.js             student iPad screens
 js/shop.js             the shop
 js/me.js               student profile page
+js/furniture.js        house furniture (pixel art), milestones, drawing rooms and houses
+js/house.js            decorate my house (house.html)
+js/village.js          the class village (village.html)
 js/classes.js          teacher classes & progress dashboard
 js/charts.js           small progress charts
 js/practice.js         practice hub (practice.html)

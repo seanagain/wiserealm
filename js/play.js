@@ -55,6 +55,7 @@ async function loadAccount() {
         <span class="coin-pill">🪙 ${fmt(prof.coins)}</span></div>
       <div class="acct-actions">
         <a class="btn small primary" href="shop.html">Shop</a>
+        <a class="btn small" href="house.html">🏠 House</a>
         <a class="btn small" href="practice.html">Practice</a>
         <a class="btn small" href="me.html">Profile</a>
         <button class="btn small" id="signOutBtn">Sign out</button>

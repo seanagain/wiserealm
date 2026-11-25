@@ -95,6 +95,7 @@ async function renderClass() {
       <button class="btn" id="cvBack">← All classes</button>
       <div class="flex">
         <button class="btn small" id="cvCode">Show join code</button>
+        <a class="btn small" id="cvVillage" href="village.html?class=${encodeURIComponent(c.id)}">🏘 Village</a>
         <button class="btn small" id="cvRename">Rename</button>
         <button class="btn small" id="cvArchive">${c.archived ? 'Unarchive' : 'Archive'}</button>
         <button class="btn small" id="cvCsv">⬇ Export CSV</button>
@@ -203,6 +204,7 @@ async function openStudent(uid) {
     <div class="flex"><div><h2 style="margin:0">${esc(d.profile.real_name || d.profile.name)}</h2>
         <span class="muted" style="font-size:.9rem">${d.profile.real_name ? 'In games: <b>' + esc(d.profile.name) + '</b> · ' : ''}${esc(d.profile.email || '')}</span></div>
       <span class="spacer"></span><button class="btn small" id="renameStudent" data-uid="${esc(uid)}" data-name="${esc(d.profile.name)}">✏️ Rename (in-game name)</button>
+      <button class="btn small" id="resetHouse" data-uid="${esc(uid)}" data-name="${esc(d.profile.real_name || d.profile.name)}">🏠 Reset house</button>
       <button class="btn small danger" id="deleteStudent" data-uid="${esc(uid)}" data-name="${esc(d.profile.real_name || d.profile.name)}">🗑 Delete data</button></div>
     <div class="tiles">
       <div class="card tile-stat"><div class="lbl">Games</div><div class="num">${g.length}</div></div>
@@ -282,6 +284,12 @@ $('#classView').addEventListener('click', async e => {
 });
 $('#detailClose').onclick = () => $('#detail').close();
 $('#detailBody').addEventListener('click', async e => {
+  const rh = e.target.closest('#resetHouse');
+  if (rh) {
+    if (!confirm(`Reset ${rh.dataset.name}'s house to the starter room? Their furniture stays theirs; only the decorating is cleared.`)) return;
+    try { await accounts.resetHouse(rh.dataset.uid); alert('Done. Their house is back to the starter room.'); } catch (err) { alert(err.message); }
+    return;
+  }
   const del = e.target.closest('#deleteStudent');
   if (del) {
     // For when a family asks for their child's data to be deleted.

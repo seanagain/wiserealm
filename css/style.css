@@ -714,3 +714,64 @@ dialog { background: var(--panel); color: var(--text); border: 4px solid var(--f
 
 /* Four Corners: secret corners (a check mark shows who has picked) */
 .chero.picked::after { content: '✓'; position: absolute; right: -4px; top: 10px; font-family: var(--pixel); font-size: 11px; color: var(--ink); background: var(--good); border: 2px solid var(--ink); padding: 0 3px; }
+
+/* ---------- My House ---------- */
+.house-page, .village-page { flex-direction: column; max-width: 1200px; margin: 0 auto; padding: 18px 16px 60px; gap: 16px; }
+.house-main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.house-room-card { padding: 14px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 10px; }
+.room-wrap { position: relative; cursor: pointer; touch-action: manipulation; border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); }
+.room-svg { display: block; width: 100%; height: auto; }
+.room-sel { position: absolute; outline: 3px dashed var(--gold); outline-offset: 2px; pointer-events: none; animation: selBlink 1s steps(2) infinite; }
+@keyframes selBlink { 50% { outline-color: #fff; } }
+.room-tools { min-height: 44px; display: flex; align-items: center; justify-content: center; text-align: center; }
+.room-tools .btn[data-mv] { min-width: 44px; }
+.house-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.house-panel { padding: 14px; max-height: calc(100dvh - 150px); overflow-y: auto; }
+.hitems { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.hitem { background: #15122c; border: 3px solid var(--ink); box-shadow: 0 0 0 2px var(--line); padding: 8px; display: flex; flex-direction: column; gap: 5px; align-items: center; text-align: center; color: var(--text); font: inherit; }
+.hitem .pic { width: 80px; height: 80px; }
+.hitem .pic svg { width: 100%; height: 100%; display: block; }
+.hitem .nm { font-weight: 700; font-size: .92rem; }
+.hitem .price { font-family: var(--pixel); font-size: .65rem; color: var(--gold); }
+.hitem .owned { font-family: var(--pixel); font-size: .6rem; color: var(--good); }
+.hitem .btn { width: 100%; }
+.hitem.ext { cursor: pointer; }
+.hitem.ext .pic { width: 96px; height: 90px; }
+.hitem.sel { box-shadow: 0 0 0 3px var(--gold); }
+.goals { display: flex; flex-direction: column; gap: 10px; }
+.goal { display: flex; gap: 12px; align-items: center; padding: 8px; background: #15122c; border: 3px solid var(--ink); box-shadow: 0 0 0 2px var(--line); }
+.goal .pic { width: 64px; height: 64px; flex: none; filter: grayscale(1) brightness(.6); }
+.goal.done .pic { filter: none; }
+.goal.done { box-shadow: 0 0 0 2px var(--good); }
+.goal .pic svg { width: 100%; height: 100%; }
+@media (max-width: 860px) { .house-main { grid-template-columns: 1fr; } .house-room-card { position: static; } .house-panel { max-height: none; } }
+
+/* ---------- Village ---------- */
+.village { position: relative; margin-top: 12px; padding: 18px 14px 26px; border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame);
+  background-color: #5a9e47; background-image: radial-gradient(#6cb257 18%, transparent 20%), radial-gradient(#4f8f3f 14%, transparent 16%);
+  background-size: 28px 28px, 22px 22px; background-position: 0 0, 11px 13px; display: flex; flex-direction: column; gap: 10px; }
+.village-sign { align-self: center; font-family: var(--pixel); font-size: 1rem; color: #2b1a00; background: #e9c46a; border: 4px solid var(--ink); padding: 8px 14px; box-shadow: 4px 4px 0 rgba(0, 0, 0, .35); }
+.village-top { display: flex; justify-content: center; }
+.village-road { height: 22px; background: repeating-linear-gradient(90deg, #c9b38a 0 26px, #bba57c 26px 52px); border-top: 3px solid #8a7653; border-bottom: 3px solid #8a7653; margin: 4px -14px; }
+.village-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px 12px; }
+.plot { position: relative; background: none; border: 0; padding: 4px 4px 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; color: var(--text); font: inherit; }
+.plot:hover .plot-house, .plot:focus-visible .plot-house { transform: translateY(-3px); }
+.plot-house { width: 132px; transition: transform .15s steps(2); filter: drop-shadow(3px 4px 0 rgba(0, 0, 0, .28)); }
+.plot-house svg { width: 100%; height: auto; display: block; }
+.plot-hero { position: absolute; left: 50%; bottom: 22px; width: 40px; transform: translateX(26px); }
+.plot-hero svg { width: 100%; height: auto; display: block; }
+.plot-name { font-size: .85rem; font-weight: 700; background: var(--ink); color: #fff; padding: 2px 8px; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plot.me .plot-name { background: var(--gold); color: var(--ink); }
+.plot.teacher .plot-house { width: 190px; }
+.plot.teacher .plot-hero { width: 52px; bottom: 26px; transform: translateX(46px); }
+.plot.teacher .plot-name { font-size: 1rem; }
+.lot { height: 130px; border: 3px dashed rgba(255, 255, 255, .55); display: grid; place-items: center; background: rgba(120, 90, 50, .35); }
+.lot-sign { font-family: var(--pixel); font-size: .7rem; text-align: center; line-height: 1.8; color: #2b1a00; background: #e9c46a; border: 3px solid var(--ink); padding: 6px 10px; }
+.lot-sign small { font-size: .55rem; color: #6b4a00; }
+.visit-dialog { width: min(820px, 94vw); background: var(--panel); color: var(--text); border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); padding: 16px; }
+.visit-dialog::backdrop { background: rgba(10, 8, 20, .7); }
+.visit-dialog[open] { display: flex; flex-direction: column; gap: 12px; }
+.visit-room { border: 4px solid var(--ink); }
+.visit-room svg { display: block; width: 100%; height: auto; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tabs .btn.sel { background: var(--gold); color: #2b1a00; }

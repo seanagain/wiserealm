@@ -151,6 +151,7 @@ begin
   if not found then raise exception 'That item does not exist'; end if;
   select * into prof from public.profiles where id = auth.uid() for update;
   if p_item = any (prof.owned) then raise exception 'You already own that'; end if;
+  if item.milestone is not null then raise exception 'That is earned with a learning milestone, not bought'; end if;
   if prof.coins < item.price then raise exception 'Not enough coins'; end if;
   update public.profiles set coins = coins - item.price, owned = array_append(owned, p_item)
     where id = auth.uid() returning * into prof;
@@ -1012,87 +1013,250 @@ end $$;
 revoke all on function public.add_usage(integer), public.site_usage() from public, anon;
 grant execute on function public.add_usage(integer), public.site_usage() to authenticated;
 
--- ---------- Shop catalog (generated from js/items.js by tools/gen-shop-sql.mjs) ----------
+-- ================= Houses & the class village =================
+-- Each student has ONE house (the same house shows up in every class village they're in).
+-- A class village is just the houses of the class's current members, plus the teacher's house,
+-- worked out each time it's opened: joining or leaving a class adds or removes a house.
+-- Classmates can look at each other's houses (in-game name and hero only). Nobody else can.
+alter table public.shop_items add column if not exists milestone text; -- set = earned by learning, can't be bought
+alter table public.profiles add column if not exists unlocked text[] not null default '{}'; -- milestones reached
+
+create table if not exists public.houses (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.houses enable row level security; -- no policies: only the functions below can read or write
+
+-- A student's learning numbers, for milestones. (Only used inside the functions below.)
+create or replace function public.house_progress(p_user uuid, p_tz text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'classes', (select count(*) from public.class_members m join public.classes c on c.id = m.class_id where m.user_id = p_user and not c.archived),
+    'games', (select count(*) from public.game_results where user_id = p_user),
+    'correct', (select coalesce(sum(correct), 0) from public.game_results where user_id = p_user),
+    'practices', (select count(*) from public.practice_sessions where user_id = p_user),
+    'streak', public.practice_streak(p_user, p_tz),
+    'mastered', (select count(*) from public.practice_cards where user_id = p_user and box >= 3));
+$$;
+
+-- May this person use this piece of furniture / wallpaper / floor?
+create or replace function public.house_item_ok(p_id text, p_slot text, p_owned text[], p_unlocked text[], p_teacher boolean) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.shop_items s where s.id = p_id and s.slot = p_slot
+    and (p_teacher or (s.milestone is null and (s.price = 0 or p_id = any (p_owned))) or (s.milestone is not null and s.milestone = any (p_unlocked))));
+$$;
+
+-- My house, my milestone progress, and newly reached milestones (kept forever once reached).
+-- Keep the list in sync with MILESTONES in js/furniture.js.
+create or replace function public.my_house(p_tz text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); prog jsonb; got text[]; h jsonb; un text[];
+begin
+  if me is null then raise exception 'Not signed in'; end if;
+  perform public.my_profile();
+  prog := public.house_progress(me, p_tz);
+  select coalesce(array_agg(m.id), '{}') into got from (values
+    ('m_class', 'classes', 1), ('m_game1', 'games', 1), ('m_game10', 'games', 10), ('m_game25', 'games', 25),
+    ('m_correct100', 'correct', 100), ('m_practice10', 'practices', 10), ('m_streak5', 'streak', 5),
+    ('m_master20', 'mastered', 20), ('m_master75', 'mastered', 75)) as m(id, stat, need)
+    where (prog ->> m.stat)::int >= m.need;
+  update public.profiles set unlocked = array(select distinct x from unnest(unlocked || got) x order by x)
+    where id = me returning unlocked into un;
+  select data into h from public.houses where user_id = me;
+  return jsonb_build_object('house', h, 'progress', prog, 'unlocked', to_jsonb(un), 'teacher', public.is_teacher());
+end $$;
+
+-- Save my house. Checks everything: only furniture I may use, inside the room, limits.
+create or replace function public.save_house(p_house jsonb) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); prof public.profiles; teach boolean := public.is_teacher();
+  e jsonb; items jsonb := '[]'::jsonb; cnt jsonb := '{}'::jsonb; x int; y int; c int; w text; f text; ext int := 0;
+begin
+  if me is null then raise exception 'Not signed in'; end if;
+  perform public.my_profile();
+  if jsonb_typeof(p_house) <> 'object' or length(p_house::text) > 6000 then raise exception 'Invalid house'; end if;
+  select * into prof from public.profiles where id = me;
+  w := coalesce(p_house ->> 'wall', 'w_plain'); f := coalesce(p_house ->> 'floor', 'fl_wood');
+  if not public.house_item_ok(w, 'wall', prof.owned, prof.unlocked, teach) then raise exception 'You can''t use that wallpaper yet'; end if;
+  if not public.house_item_ok(f, 'floor', prof.owned, prof.unlocked, teach) then raise exception 'You can''t use that floor yet'; end if;
+  if jsonb_typeof(p_house -> 'ext') = 'number' then ext := least(5, greatest(0, (p_house ->> 'ext')::int)); end if;
+  if jsonb_typeof(p_house -> 'items') = 'array' then
+    if jsonb_array_length(p_house -> 'items') > 40 then raise exception 'That''s too many things for one house (40 at most)'; end if;
+    for e in select * from jsonb_array_elements(p_house -> 'items') loop
+      if jsonb_typeof(e) <> 'array' or jsonb_array_length(e) < 3 then raise exception 'Invalid house'; end if;
+      if not public.house_item_ok(e ->> 0, 'furn', prof.owned, prof.unlocked, teach) then raise exception 'You can''t use % yet', e ->> 0; end if;
+      x := (e ->> 1)::int; y := (e ->> 2)::int;
+      if x < 0 or x > 11 or y < 0 or y > 8 then raise exception 'Invalid house'; end if;
+      c := coalesce((cnt ->> (e ->> 0))::int, 0) + 1;
+      if c > 4 then raise exception 'You can place up to 4 of each thing'; end if;
+      cnt := cnt || jsonb_build_object(e ->> 0, c);
+      items := items || jsonb_build_array(jsonb_build_array(e ->> 0, x, y, case when e ->> 3 in ('1', 'true') then 1 else 0 end));
+    end loop;
+  end if;
+  insert into public.houses (user_id, data, updated_at)
+    values (me, jsonb_build_object('wall', w, 'floor', f, 'ext', ext, 'items', items), now())
+    on conflict (user_id) do update set data = excluded.data, updated_at = now();
+  return true;
+end $$;
+
+-- A class village: the teacher's house and every current member's house.
+-- Only the class's teacher and its members can open it. Shows in-game names and heroes only.
+create or replace function public.class_village(p_class uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare me uuid := auth.uid(); c public.classes;
+begin
+  if me is null then raise exception 'Not signed in'; end if;
+  select * into c from public.classes where id = p_class;
+  if not found or (c.teacher_id <> me and not exists (select 1 from public.class_members where class_id = p_class and user_id = me)) then
+    raise exception 'You can only visit villages of your own classes';
+  end if;
+  return jsonb_build_object('name', c.name,
+    'teacher', (select jsonb_build_object('name', p.display_name, 'avatar', p.avatar, 'house', h.data, 'me', p.id = me)
+      from public.profiles p left join public.houses h on h.user_id = p.id where p.id = c.teacher_id),
+    'houses', coalesce((select jsonb_agg(jsonb_build_object('name', p.display_name, 'avatar', p.avatar, 'house', h.data, 'me', p.id = me) order by m.joined_at, p.id)
+      from public.class_members m join public.profiles p on p.id = m.user_id left join public.houses h on h.user_id = m.user_id
+      where m.class_id = p_class and m.user_id <> c.teacher_id), '[]'::jsonb));
+end $$;
+
+-- Teacher: reset a student's house (just in case).
+create or replace function public.reset_house(p_user uuid) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.teacher_sees(p_user) then raise exception 'That student isn''t in one of your classes or games'; end if;
+  delete from public.houses where user_id = p_user;
+  return true;
+end $$;
+
+revoke all on function public.house_progress(uuid, text), public.house_item_ok(text, text, text[], text[], boolean),
+  public.practice_streak(uuid, text) from public, anon, authenticated;
+revoke all on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid) from public, anon;
+grant execute on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid) to authenticated;
+
+-- ---------- Shop catalog (generated from js/items.js and js/furniture.js by tools/gen-shop-sql.mjs) ----------
 -- BEGIN SHOP ITEMS
-insert into public.shop_items (id, slot, name, price) values
-  ('hat_top', 'phat', 'Top Hat', 100),
-  ('hat_pirate', 'phat', 'Pirate Hat', 120),
-  ('hat_viking', 'phat', 'Viking Helmet', 150),
-  ('hat_chef', 'phat', 'Chef Hat', 60),
-  ('hat_frog', 'phat', 'Frog Hat', 90),
-  ('hat_halo', 'phat', 'Halo', 200),
-  ('hat_flowers', 'phat', 'Flower Crown', 80),
-  ('hat_dragon', 'phat', 'Dragon Helm', 300),
-  ('top_armor', 'top', 'Knight Armor', 160),
-  ('top_tux', 'top', 'Tuxedo', 140),
-  ('top_robe', 'top', 'Wizard Robe', 120),
-  ('top_jersey', 'top', 'Team Jersey', 90),
-  ('top_hawaii', 'top', 'Island Shirt', 110),
-  ('top_hoodie', 'top', 'Cozy Hoodie', 70),
-  ('cape_red', 'cape', 'Hero Cape', 100),
-  ('cape_royal', 'cape', 'Royal Cape', 180),
-  ('cape_shadow', 'cape', 'Shadow Cape', 150),
-  ('cape_ice', 'cape', 'Frost Cape', 160),
-  ('cape_gold', 'cape', 'Legendary Cape', 400),
-  ('acc_glasses', 'acc', 'Smart Glasses', 50),
-  ('acc_patch', 'acc', 'Eye Patch', 60),
-  ('acc_stache', 'acc', 'Mustache', 70),
-  ('acc_mask', 'acc', 'Ninja Mask', 80),
-  ('acc_monocle', 'acc', 'Monocle', 90),
-  ('acc_shades', 'acc', 'Star Shades', 120),
-  ('pet_slime', 'pet', 'Slime Buddy', 150),
-  ('pet_cat', 'pet', 'Cat', 200),
-  ('pet_owl', 'pet', 'Owl', 250),
-  ('pet_duck', 'pet', 'Duck', 120),
-  ('pet_dragon', 'pet', 'Baby Dragon', 400),
-  ('hat_cowboy', 'phat', 'Cowboy Hat', 110),
-  ('hat_party', 'phat', 'Party Hat', 70),
-  ('hat_bunny', 'phat', 'Bunny Ears', 90),
-  ('hat_cat', 'phat', 'Cat Ears', 80),
-  ('hat_astro', 'phat', 'Astronaut Helmet', 350),
-  ('hat_grad', 'phat', 'Graduation Cap', 150),
-  ('hat_santa', 'phat', 'Santa Hat', 120),
-  ('hat_mushroom', 'phat', 'Mushroom Cap', 100),
-  ('top_space', 'top', 'Space Suit', 200),
-  ('top_super', 'top', 'Superhero Suit', 180),
-  ('top_lab', 'top', 'Lab Coat', 120),
-  ('top_pirate', 'top', 'Pirate Coat', 150),
-  ('top_rainbow', 'top', 'Rainbow Sweater', 100),
-  ('cape_ember', 'cape', 'Ember Cape', 170),
-  ('cape_forest', 'cape', 'Forest Cape', 140),
-  ('cape_galaxy', 'cape', 'Galaxy Cape', 250),
-  ('acc_clown', 'acc', 'Clown Nose', 50),
-  ('acc_fangs', 'acc', 'Vampire Fangs', 80),
-  ('acc_hearts', 'acc', 'Heart Eyes', 100),
-  ('acc_bandage', 'acc', 'Bandage', 40),
-  ('acc_freckles', 'acc', 'Freckles', 30),
-  ('pet_penguin', 'pet', 'Penguin', 220),
-  ('pet_bunny', 'pet', 'Bunny', 180),
-  ('pet_ghost', 'pet', 'Ghost', 260),
-  ('pet_robot', 'pet', 'Robot', 320),
-  ('pet_fox', 'pet', 'Fox', 240),
-  ('pet_phoenix', 'pet', 'Phoenix', 500),
-  ('emote_hi', 'emote', 'Hi!', 0),
-  ('emote_gg', 'emote', 'GG', 0),
-  ('emote_nice', 'emote', 'Nice one!', 0),
-  ('emote_67', 'emote', '67', 150),
-  ('emote_sheesh', 'emote', 'Sheesh', 100),
-  ('emote_bruh', 'emote', 'Bruh', 80),
-  ('emote_oof', 'emote', 'Oof', 60),
-  ('emote_bigbrain', 'emote', 'Big Brain', 120),
-  ('emote_letsgo', 'emote', 'Let’s Go', 100),
-  ('emote_aura', 'emote', '+1000 Aura', 200),
-  ('emote_thanks', 'emote', 'Thank You', 90),
-  ('emote_hype', 'emote', 'Hype', 250),
-  ('emote_dance', 'emote', 'Victory Dance', 300),
-  ('emote_mindblown', 'emote', 'Mind Blown', 150),
-  ('emote_clutch', 'emote', 'Clutch!', 120),
-  ('emote_freeze', 'emote', 'Brain Freeze', 90),
-  ('emote_respect', 'emote', 'Respect', 100),
-  ('emote_knewit', 'emote', 'I Knew It!', 80),
-  ('emote_twist', 'emote', 'Plot Twist!', 110)
-on conflict (id) do update set slot = excluded.slot, name = excluded.name, price = excluded.price;
-delete from public.shop_items where id not in ('hat_top', 'hat_pirate', 'hat_viking', 'hat_chef', 'hat_frog', 'hat_halo', 'hat_flowers', 'hat_dragon', 'top_armor', 'top_tux', 'top_robe', 'top_jersey', 'top_hawaii', 'top_hoodie', 'cape_red', 'cape_royal', 'cape_shadow', 'cape_ice', 'cape_gold', 'acc_glasses', 'acc_patch', 'acc_stache', 'acc_mask', 'acc_monocle', 'acc_shades', 'pet_slime', 'pet_cat', 'pet_owl', 'pet_duck', 'pet_dragon', 'hat_cowboy', 'hat_party', 'hat_bunny', 'hat_cat', 'hat_astro', 'hat_grad', 'hat_santa', 'hat_mushroom', 'top_space', 'top_super', 'top_lab', 'top_pirate', 'top_rainbow', 'cape_ember', 'cape_forest', 'cape_galaxy', 'acc_clown', 'acc_fangs', 'acc_hearts', 'acc_bandage', 'acc_freckles', 'pet_penguin', 'pet_bunny', 'pet_ghost', 'pet_robot', 'pet_fox', 'pet_phoenix', 'emote_hi', 'emote_gg', 'emote_nice', 'emote_67', 'emote_sheesh', 'emote_bruh', 'emote_oof', 'emote_bigbrain', 'emote_letsgo', 'emote_aura', 'emote_thanks', 'emote_hype', 'emote_dance', 'emote_mindblown', 'emote_clutch', 'emote_freeze', 'emote_respect', 'emote_knewit', 'emote_twist');
+insert into public.shop_items (id, slot, name, price, milestone) values
+  ('hat_top', 'phat', 'Top Hat', 100, null),
+  ('hat_pirate', 'phat', 'Pirate Hat', 120, null),
+  ('hat_viking', 'phat', 'Viking Helmet', 150, null),
+  ('hat_chef', 'phat', 'Chef Hat', 60, null),
+  ('hat_frog', 'phat', 'Frog Hat', 90, null),
+  ('hat_halo', 'phat', 'Halo', 200, null),
+  ('hat_flowers', 'phat', 'Flower Crown', 80, null),
+  ('hat_dragon', 'phat', 'Dragon Helm', 300, null),
+  ('top_armor', 'top', 'Knight Armor', 160, null),
+  ('top_tux', 'top', 'Tuxedo', 140, null),
+  ('top_robe', 'top', 'Wizard Robe', 120, null),
+  ('top_jersey', 'top', 'Team Jersey', 90, null),
+  ('top_hawaii', 'top', 'Island Shirt', 110, null),
+  ('top_hoodie', 'top', 'Cozy Hoodie', 70, null),
+  ('cape_red', 'cape', 'Hero Cape', 100, null),
+  ('cape_royal', 'cape', 'Royal Cape', 180, null),
+  ('cape_shadow', 'cape', 'Shadow Cape', 150, null),
+  ('cape_ice', 'cape', 'Frost Cape', 160, null),
+  ('cape_gold', 'cape', 'Legendary Cape', 400, null),
+  ('acc_glasses', 'acc', 'Smart Glasses', 50, null),
+  ('acc_patch', 'acc', 'Eye Patch', 60, null),
+  ('acc_stache', 'acc', 'Mustache', 70, null),
+  ('acc_mask', 'acc', 'Ninja Mask', 80, null),
+  ('acc_monocle', 'acc', 'Monocle', 90, null),
+  ('acc_shades', 'acc', 'Star Shades', 120, null),
+  ('pet_slime', 'pet', 'Slime Buddy', 150, null),
+  ('pet_cat', 'pet', 'Cat', 200, null),
+  ('pet_owl', 'pet', 'Owl', 250, null),
+  ('pet_duck', 'pet', 'Duck', 120, null),
+  ('pet_dragon', 'pet', 'Baby Dragon', 400, null),
+  ('hat_cowboy', 'phat', 'Cowboy Hat', 110, null),
+  ('hat_party', 'phat', 'Party Hat', 70, null),
+  ('hat_bunny', 'phat', 'Bunny Ears', 90, null),
+  ('hat_cat', 'phat', 'Cat Ears', 80, null),
+  ('hat_astro', 'phat', 'Astronaut Helmet', 350, null),
+  ('hat_grad', 'phat', 'Graduation Cap', 150, null),
+  ('hat_santa', 'phat', 'Santa Hat', 120, null),
+  ('hat_mushroom', 'phat', 'Mushroom Cap', 100, null),
+  ('top_space', 'top', 'Space Suit', 200, null),
+  ('top_super', 'top', 'Superhero Suit', 180, null),
+  ('top_lab', 'top', 'Lab Coat', 120, null),
+  ('top_pirate', 'top', 'Pirate Coat', 150, null),
+  ('top_rainbow', 'top', 'Rainbow Sweater', 100, null),
+  ('cape_ember', 'cape', 'Ember Cape', 170, null),
+  ('cape_forest', 'cape', 'Forest Cape', 140, null),
+  ('cape_galaxy', 'cape', 'Galaxy Cape', 250, null),
+  ('acc_clown', 'acc', 'Clown Nose', 50, null),
+  ('acc_fangs', 'acc', 'Vampire Fangs', 80, null),
+  ('acc_hearts', 'acc', 'Heart Eyes', 100, null),
+  ('acc_bandage', 'acc', 'Bandage', 40, null),
+  ('acc_freckles', 'acc', 'Freckles', 30, null),
+  ('pet_penguin', 'pet', 'Penguin', 220, null),
+  ('pet_bunny', 'pet', 'Bunny', 180, null),
+  ('pet_ghost', 'pet', 'Ghost', 260, null),
+  ('pet_robot', 'pet', 'Robot', 320, null),
+  ('pet_fox', 'pet', 'Fox', 240, null),
+  ('pet_phoenix', 'pet', 'Phoenix', 500, null),
+  ('emote_hi', 'emote', 'Hi!', 0, null),
+  ('emote_gg', 'emote', 'GG', 0, null),
+  ('emote_nice', 'emote', 'Nice one!', 0, null),
+  ('emote_67', 'emote', '67', 150, null),
+  ('emote_sheesh', 'emote', 'Sheesh', 100, null),
+  ('emote_bruh', 'emote', 'Bruh', 80, null),
+  ('emote_oof', 'emote', 'Oof', 60, null),
+  ('emote_bigbrain', 'emote', 'Big Brain', 120, null),
+  ('emote_letsgo', 'emote', 'Let’s Go', 100, null),
+  ('emote_aura', 'emote', '+1000 Aura', 200, null),
+  ('emote_thanks', 'emote', 'Thank You', 90, null),
+  ('emote_hype', 'emote', 'Hype', 250, null),
+  ('emote_dance', 'emote', 'Victory Dance', 300, null),
+  ('emote_mindblown', 'emote', 'Mind Blown', 150, null),
+  ('emote_clutch', 'emote', 'Clutch!', 120, null),
+  ('emote_freeze', 'emote', 'Brain Freeze', 90, null),
+  ('emote_respect', 'emote', 'Respect', 100, null),
+  ('emote_knewit', 'emote', 'I Knew It!', 80, null),
+  ('emote_twist', 'emote', 'Plot Twist!', 110, null),
+  ('f_bed', 'furn', 'Cozy Bed', 0, null),
+  ('f_chair', 'furn', 'Wooden Chair', 0, null),
+  ('f_table', 'furn', 'Little Table', 0, null),
+  ('f_rug', 'furn', 'Round Rug', 0, null),
+  ('f_plant', 'furn', 'Potted Plant', 30, null),
+  ('f_lamp', 'furn', 'Floor Lamp', 40, null),
+  ('f_beanbag', 'furn', 'Beanbag', 60, null),
+  ('f_rug_star', 'furn', 'Starry Rug', 70, null),
+  ('f_desk', 'furn', 'Desk', 80, null),
+  ('f_guitar', 'furn', 'Guitar', 90, null),
+  ('f_bookshelf', 'furn', 'Bookshelf', 90, null),
+  ('f_fridge', 'furn', 'Snack Fridge', 100, null),
+  ('f_sofa', 'furn', 'Comfy Sofa', 120, null),
+  ('f_tv', 'furn', 'TV', 150, null),
+  ('f_fishtank', 'furn', 'Fish Tank', 160, null),
+  ('f_fireplace', 'furn', 'Fireplace', 220, null),
+  ('f_piano', 'furn', 'Piano', 250, null),
+  ('f_arcade', 'furn', 'Arcade Machine', 300, null),
+  ('f_throne', 'furn', 'Golden Throne', 400, null),
+  ('f_clock', 'furn', 'Wall Clock', 25, null),
+  ('f_poster', 'furn', 'Space Poster', 35, null),
+  ('f_shelf', 'furn', 'Wall Shelf', 45, null),
+  ('f_window', 'furn', 'Window', 50, null),
+  ('f_painting', 'furn', 'Mountain Painting', 60, null),
+  ('m_mat', 'furn', 'Welcome Mat', 0, 'm_class'),
+  ('m_trophy1', 'furn', 'Bronze Trophy', 0, 'm_game1'),
+  ('m_trophy2', 'furn', 'Silver Trophy', 0, 'm_game10'),
+  ('m_trophy3', 'furn', 'Gold Trophy', 0, 'm_game25'),
+  ('m_telescope', 'furn', 'Telescope', 0, 'm_correct100'),
+  ('m_studydesk', 'furn', 'Study Desk', 0, 'm_practice10'),
+  ('m_torch', 'furn', 'Streak Torch', 0, 'm_streak5'),
+  ('m_wisdom', 'furn', 'Bookshelf of Wisdom', 0, 'm_master20'),
+  ('m_globe', 'furn', 'Giant Globe', 0, 'm_master75'),
+  ('w_plain', 'wall', 'Cream Wall', 0, null),
+  ('w_blue', 'wall', 'Sky Blue Wall', 30, null),
+  ('w_stripes', 'wall', 'Candy Stripes', 50, null),
+  ('w_brick', 'wall', 'Brick Wall', 60, null),
+  ('w_stars', 'wall', 'Night Sky', 80, null),
+  ('fl_wood', 'floor', 'Wood Floor', 0, null),
+  ('fl_tile', 'floor', 'White Tiles', 30, null),
+  ('fl_carpet', 'floor', 'Blue Carpet', 50, null),
+  ('fl_check', 'floor', 'Checkerboard', 60, null),
+  ('fl_grass', 'floor', 'Indoor Grass', 80, null)
+on conflict (id) do update set slot = excluded.slot, name = excluded.name, price = excluded.price, milestone = excluded.milestone;
+delete from public.shop_items where id not in ('hat_top', 'hat_pirate', 'hat_viking', 'hat_chef', 'hat_frog', 'hat_halo', 'hat_flowers', 'hat_dragon', 'top_armor', 'top_tux', 'top_robe', 'top_jersey', 'top_hawaii', 'top_hoodie', 'cape_red', 'cape_royal', 'cape_shadow', 'cape_ice', 'cape_gold', 'acc_glasses', 'acc_patch', 'acc_stache', 'acc_mask', 'acc_monocle', 'acc_shades', 'pet_slime', 'pet_cat', 'pet_owl', 'pet_duck', 'pet_dragon', 'hat_cowboy', 'hat_party', 'hat_bunny', 'hat_cat', 'hat_astro', 'hat_grad', 'hat_santa', 'hat_mushroom', 'top_space', 'top_super', 'top_lab', 'top_pirate', 'top_rainbow', 'cape_ember', 'cape_forest', 'cape_galaxy', 'acc_clown', 'acc_fangs', 'acc_hearts', 'acc_bandage', 'acc_freckles', 'pet_penguin', 'pet_bunny', 'pet_ghost', 'pet_robot', 'pet_fox', 'pet_phoenix', 'emote_hi', 'emote_gg', 'emote_nice', 'emote_67', 'emote_sheesh', 'emote_bruh', 'emote_oof', 'emote_bigbrain', 'emote_letsgo', 'emote_aura', 'emote_thanks', 'emote_hype', 'emote_dance', 'emote_mindblown', 'emote_clutch', 'emote_freeze', 'emote_respect', 'emote_knewit', 'emote_twist', 'f_bed', 'f_chair', 'f_table', 'f_rug', 'f_plant', 'f_lamp', 'f_beanbag', 'f_rug_star', 'f_desk', 'f_guitar', 'f_bookshelf', 'f_fridge', 'f_sofa', 'f_tv', 'f_fishtank', 'f_fireplace', 'f_piano', 'f_arcade', 'f_throne', 'f_clock', 'f_poster', 'f_shelf', 'f_window', 'f_painting', 'm_mat', 'm_trophy1', 'm_trophy2', 'm_trophy3', 'm_telescope', 'm_studydesk', 'm_torch', 'm_wisdom', 'm_globe', 'w_plain', 'w_blue', 'w_stripes', 'w_brick', 'w_stars', 'fl_wood', 'fl_tile', 'fl_carpet', 'fl_check', 'fl_grass');
 -- END SHOP ITEMS
 
 -- Tell Supabase's API to pick up new and changed functions right away.

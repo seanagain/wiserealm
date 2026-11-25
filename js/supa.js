@@ -6,7 +6,8 @@
 import { CONFIG } from './config.js';
 import { load, save } from './common.js';
 import { ITEM_BY_ID, ITEMS } from './items.js';
-import { PREMIUM_SLOTS } from './avatar.js';
+import { PREMIUM_SLOTS, randomAvatar } from './avatar.js';
+import { HOUSE_BY_ID, MILESTONES, FURNITURE, EXTERIORS, normalizeHouse, canUse } from './furniture.js';
 
 export const isOnline = () => !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
@@ -115,6 +116,11 @@ const online = {
   playersOwned(uids) { return uids.length ? this.rpc('players_owned', { p_users: uids }) : Promise.resolve([]); },
   setDisplayName(name) { return this.rpc('set_display_name', { p_name: name }); },
   renameStudent(user, name) { return this.rpc('rename_student', { p_user: user, p_name: name }); },
+  // houses & the class village
+  myHouse() { return this.rpc('my_house', { p_tz: TZ }); },
+  saveHouse(house) { return this.rpc('save_house', { p_house: house }); },
+  classVillage(cls) { return this.rpc('class_village', { p_class: cls }); },
+  resetHouse(user) { return this.rpc('reset_house', { p_user: user }); },
   // solo practice
   assignSet(cls, set, on) { return this.rpc('assign_set', { p_class: cls, p_set: set, p_on: on }); },
   classAssignedSets(cls) { return this.rpc('class_assigned_sets', { p_class: cls }); },
@@ -139,8 +145,9 @@ const demo = {
   async onChange() {},
   async profile() { const p = demoProfile(); save(DEMO_KEY, p); return p; },
   async buy(id) {
-    const p = demoProfile(), it = ITEM_BY_ID[id];
+    const p = demoProfile(), it = ITEM_BY_ID[id] || HOUSE_BY_ID[id];
     if (!it) throw new Error('That item doesn’t exist.');
+    if (it.milestone) throw new Error('That is earned with a learning milestone, not bought.');
     if (p.owned.includes(id)) throw new Error('You already own that.');
     if (p.coins < it.price) throw new Error('Not enough coins yet. Keep playing!');
     p.coins -= it.price; p.owned.push(id); save(DEMO_KEY, p); return p;
@@ -210,6 +217,7 @@ const demo = {
   },
   async playersOwned(uids) { const p = demoProfile(); return uids.includes(p.id) ? [{ id: p.id, owned: p.owned }] : []; },
   ...demoPractice(),
+  ...demoHouses(),
   async setDisplayName(name) { const p = demoProfile(); p.display_name = demoCleanName(name); save(DEMO_KEY, p); return p; },
   async renameStudent(_u, name) { const p = demoProfile(); p.display_name = demoCleanName(name); save(DEMO_KEY, p); return p.display_name; },
 };
@@ -220,6 +228,49 @@ function demoCleanName(name) {
   if (n.length < 2 || n.length > 16) throw new Error('Names must be 2 to 16 characters');
   if (!/^[\p{L}\p{N} .'-]+$/u.test(n)) throw new Error('Names can only use letters, numbers, spaces, periods, apostrophes and dashes');
   return n;
+}
+
+// Preview-mode houses, mirroring my_house / save_house / class_village in supabase/schema.sql.
+// The village is filled with a few pretend classmates so it can be tried out.
+function demoHouses() {
+  const db = () => Object.assign({ classes: [], members: [], cards: [], psessions: [], results: [] }, load('wr_demo_db', {}));
+  const day = t => new Date(t).toLocaleDateString('en-CA');
+  const progress = () => {
+    const d = db(), days = new Set(d.psessions.map(x => day(x.played_at)));
+    let t = new Date(), streak = 0; if (!days.has(day(t))) t.setDate(t.getDate() - 1);
+    while (days.has(day(t))) { streak++; t.setDate(t.getDate() - 1); }
+    const mine = d.results.filter(r => r.user_id === 'demo-user');
+    return { classes: d.members.filter(m => m.user_id === 'demo-user').length, games: mine.length, correct: mine.reduce((a, r) => a + r.correct, 0),
+      practices: d.psessions.length, streak, mastered: d.cards.filter(c => c.box >= 3).length };
+  };
+  const NAMES = ['Maya L.', 'Leo K.', 'Ava S.', 'Kai T.', 'Zoe P.', 'Max R.', 'Ivy W.', 'Sam H.'];
+  const fake = i => {
+    const free = FURNITURE.filter(f => !f.milestone), pick = n => free[(i * 7 + n * 5) % free.length];
+    const items = [[pick(1).id, 1, 4, 0], [pick(2).id, 6, 5, i % 2], [pick(3).id, 3, 7, 0], [pick(4).id, 9, 6, 0], ['f_window', 4, 0, 0]];
+    return { name: NAMES[i], avatar: randomAvatar(), house: normalizeHouse({ wall: ['w_plain', 'w_blue', 'w_stripes', 'w_brick'][i % 4], floor: ['fl_wood', 'fl_tile', 'fl_carpet'][i % 3], ext: i % EXTERIORS.length, items }), me: false };
+  };
+  return {
+    async myHouse() {
+      const prog = progress(), p = demoProfile();
+      const un = [...new Set([...(p.unlocked || []), ...MILESTONES.filter(m => prog[m.stat] >= m.need).map(m => m.id)])];
+      p.unlocked = un; save(DEMO_KEY, p);
+      return { house: load('wr_demo_house', null), progress: prog, unlocked: un, teacher: false };
+    },
+    async saveHouse(house) {
+      const p = demoProfile();
+      for (const e of house.items || []) if (!canUse(HOUSE_BY_ID[e[0]], p.owned, p.unlocked || [])) throw new Error('You can’t use that yet.');
+      save('wr_demo_house', normalizeHouse(house)); return true;
+    },
+    async classVillage(cls) {
+      const d = db(), c = d.classes.find(x => x.id === cls); if (!c) throw new Error('You can only visit villages of your own classes');
+      const p = demoProfile(), neighbors = load('wr_demo_neighbors', null) || NAMES.slice(0, 6).map((_, i) => fake(i));
+      save('wr_demo_neighbors', neighbors);
+      const me = d.members.some(m => m.class_id === cls && m.user_id === 'demo-user') ? [{ name: p.display_name, avatar: p.avatar, house: load('wr_demo_house', null), me: true }] : [];
+      return { name: c.name, teacher: { name: 'Your teacher', avatar: { cls: 1, hat: 3, color: 7 }, house: { wall: 'w_stars', floor: 'fl_carpet', ext: 1, items: [['f_bookshelf', 0, 3, 0], ['f_throne', 6, 5, 0], ['m_globe', 9, 4, 0], ['f_painting', 4, 0, 0], ['f_rug_star', 5, 6, 0]] }, me: false },
+        houses: [...me, ...neighbors] };
+    },
+    async resetHouse() { localStorage.removeItem('wr_demo_house'); return true; },
+  };
 }
 
 // Preview-mode practice, mirroring save_practice etc. in supabase/schema.sql.
