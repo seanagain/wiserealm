@@ -17,12 +17,11 @@ export const HATS = [
   { id: 'wizard', label: 'Wizard' }, { id: 'crown', label: 'Crown' }, { id: 'headphones', label: 'Headphones' },
   { id: 'helmet', label: 'Helmet' }, { id: 'horns', label: 'Horns' }, { id: 'long', label: 'Long hair' },
 ];
-// Outfit styles. The two uniforms match the school's striped PE uniform; labels are
-// colors only, so every student can pick whichever they like.
+// Outfit styles. (The ids 'uniform_*' are kept so heroes saved earlier don't change.)
 export const STYLES = [
   { id: 'adventurer', label: 'Adventurer' },
-  { id: 'uniform_red', label: 'Uniform · Red & Gold', pal: { A: '#c0283f', Y: '#f2c230', P: '#b5203b', p: '#8c1830' } },
-  { id: 'uniform_navy', label: 'Uniform · Navy & Gold', pal: { A: '#25336b', Y: '#f2c230', P: '#2b3a6e', p: '#1c264d' } },
+  { id: 'uniform_red', label: 'Sporty Stripes · Red & Gold', pal: { A: '#c0283f', Y: '#f2c230', P: '#b5203b', p: '#8c1830' } },
+  { id: 'uniform_navy', label: 'Sporty Stripes · Navy & Gold', pal: { A: '#25336b', Y: '#f2c230', P: '#2b3a6e', p: '#1c264d' } },
 ];
 
 export const FACES = [
@@ -134,7 +133,7 @@ const BASE = { y: 3, rows: [
   '....oooooooooo',
 ] };
 
-// Striped uniform shirt, shorts, bare legs and white sneakers (drawn over the base body).
+// Striped sports shirt, shorts, bare legs and white sneakers (drawn over the base body).
 const UNIFORM = { y: 12, rows: [
   '....KYYYYYYYYK',
   '...KAAAAAAAAAAK',
