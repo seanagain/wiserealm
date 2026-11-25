@@ -212,6 +212,8 @@ export default {
           else if (!p.m.fin && p.m.s > 0) { // fill in between the iPad's updates
             const tr = T.track, nx = p.m.x + Math.cos(p.m.a) * p.m.s * dt, ny = p.m.y + Math.sin(p.m.a) * p.m.s * dt;
             if (tr.surface(nx, ny)) { p.m.x = nx; p.m.y = ny; }
+            const ni = tr.nearest(p.m.x, p.m.y, p.m.i);
+            if (ni >= p.m.i || p.m.i - ni > tr.N / 2) p.m.i = ni; // keep the place up to date between reports
           }
         }
         T.bananas = T.bananas.filter(b => now - b.at < 90000);
