@@ -17,12 +17,13 @@ import treasure from './modes/treasure.js';
 import maze from './modes/maze.js';
 import territory from './modes/territory.js';
 import kart from './modes/kart.js';
+import ctf from './modes/ctf.js';
 
-export const MODES = { raid, corners, treasure, maze, territory, kart };
+export const MODES = { raid, corners, treasure, maze, territory, ctf, kart };
 const params = new URLSearchParams(location.search);
 // The game and question set can be switched in the lobby (same room code, same students).
 let set = getSet(params.get('set'));
-let mode = MODES[params.get('game')] || raid;
+let mode = MODES[params.get('game')] || MODES[load('cq_last_game', '')] || raid; // no game in the link: the last one played
 const S = Object.assign({ time: 20, count: 0, auto: false, flip: false, emotes: true, coinMult: 1, signin: false }, load('cq_host_settings', {}));
 const code = String(10000 + Math.floor(Math.random() * 90000));
 const joinBase = new URL('./', location.href).href;
@@ -505,6 +506,7 @@ function applyChoice() {
   $$('.mode-name').forEach(e => (e.textContent = mode.name));
   $('#modeBlurb').textContent = mode.blurb || '';
   $('#setGame').value = mode.id;
+  save('cq_last_game', mode.id);
   $('#gameNowArt').innerHTML = gameArt(mode.id); $('#gameNowName').textContent = mode.name;
   $('#setSet').value = set.id;
   const n = cleanItems(set.items).length;

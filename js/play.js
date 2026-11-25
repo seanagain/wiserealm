@@ -259,6 +259,7 @@ const GAME_TEXT = {
   treasure: { intro: 'Treasure Hunt!', right: 'CORRECT!', wrong: 'Not quite!' },
   maze: { intro: 'A wild Mr. C appeared!', right: 'CORRECT!', wrong: 'Not quite!' },
   territory: { intro: 'Red vs Blue!', right: 'CORRECT!', wrong: 'Not quite!' },
+  ctf: { intro: 'Capture the Flag!', right: 'CORRECT!', wrong: 'Not quite!' },
 };
 const text = s => GAME_TEXT[s.mode] || GAME_TEXT.raid;
 
@@ -417,7 +418,7 @@ $('#bookClose').onclick = () => { $('#bookView').hidden = true; };
 
 // Territory Battle: pick a team in the lobby (when the teacher allows it).
 function renderTeamPick(s) {
-  const how = s.phase === 'lobby' && s.mode === 'territory' ? s.teamPick : null;
+  const how = s.phase === 'lobby' && (s.mode === 'territory' || s.mode === 'ctf') ? s.teamPick : null;
   const box = $('#teamPick');
   box.hidden = !how || how === 'random';
   if (box.hidden) return;
@@ -580,11 +581,13 @@ function renderMaze(s) {
     $('#mzHero').innerHTML = avatarSVG(profile.av);
     $('#mzQ').hidden = true; $('#dpad').hidden = false;
     $('#mzMsg').className = 'card mz-msg';
-    const pads = s.mode === 'territory' && s.pads;
+    const pads = (s.mode === 'territory' || s.mode === 'ctf') && s.pads;
     $('#s-maze').classList.toggle('ter-mode', !!pads);
     $('#terPad').hidden = !pads;
     if (pads) terPad.ready();
-    $('#mzMsg').textContent = s.mode === 'territory'
+    $('#mzMsg').textContent = s.mode === 'ctf'
+      ? `You’re on ${tag ? 'the ' + tag : 'a team'}! Sneak onto the other side, grab their ⚑ flag and run it back to your side. Tagged on their side? Answer right or go to jail!`
+      : s.mode === 'territory'
       ? `You’re on ${tag ? 'the ' + tag : 'a team'}! Walk with the arrows to paint the ${pads ? 'map. Your hero is the one marked YOU.' : 'arena.'} Bump into an enemy to duel: answer first to win!`
       : 'Use the arrows to move your hero through the maze. Watch the big screen!';
     show('s-maze');
@@ -642,14 +645,14 @@ function mazeMsg(m) {
     $('#dpad').hidden = true;
     $('#mzQ').hidden = false;
     $('#mzKind').textContent = m.kind === 'zap' ? '⚡ ZAP MR. C! Answer right to knock him out!' : m.kind === 'fight' ? '⚔ MR. C ATTACKS! Answer to fight back!'
-      : m.kind === 'duel' ? `🗡️ DUEL vs ${m.vs || 'an enemy'}! Answer right FIRST to win!` : m.kind === 'ink' ? '🖌 OUT OF INK: answer to refill' : '🔒 LOCKED GATE: answer to open it';
-    $('#mzKind').className = 'kind ' + (m.kind === 'fight' || m.kind === 'duel' ? 'fight' : '');
+      : m.kind === 'duel' ? `🗡️ DUEL vs ${m.vs || 'an enemy'}! Answer right FIRST to win!` : m.kind === 'ink' ? '🖌 OUT OF INK: answer to refill' : m.kind === 'tag' ? `🚨 TAGGED by ${m.vs || 'a guard'}! Answer right or go to jail!` : m.kind === 'jail' ? `⛓ IN JAIL: answer 3 right to escape (${m.vs || '0/3'})` : '🔒 LOCKED GATE: answer to open it';
+    $('#mzKind').className = 'kind ' + (m.kind === 'fight' || m.kind === 'duel' || m.kind === 'tag' ? 'fight' : '');
     $('#mzPrompt').textContent = m.q.prompt;
     $('#mzChoices').innerHTML = m.q.choices.map((c, i) =>
       `<button class="choice ${CHOICE_STYLE[i].cls}" data-c="${i}"><span class="ico">${CHOICE_STYLE[i].icon}</span><span>${esc(c)}</span></button>`).join('');
     $('#mzMsg').className = 'card mz-msg ' + (m.kind === 'fight' || m.kind === 'duel' ? 'bad' : '');
     $('#mzMsg').textContent = m.kind === 'fight' ? 'Battle! Get it right to bonk Mr. C away!' : m.kind === 'duel' ? 'Quick! You both have the same question.'
-      : m.kind === 'ink' ? 'Get it right for a full tank of ink.' : 'Answer correctly to unlock this gate.';
+      : m.kind === 'ink' ? 'Get it right for a full tank of ink.' : m.kind === 'tag' ? 'Right answer: you slip away. Wrong answer: jail!' : m.kind === 'jail' ? 'Or wait for a teammate to break you out!' : 'Answer correctly to unlock this gate.';
   } else {
     mzToken = null;
     $('#mzQ').hidden = true;

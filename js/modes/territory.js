@@ -81,7 +81,7 @@ function connect(T) {
   return true;
 }
 
-function build(ctx) {
+export function build(ctx) {
   const n = ctx.players().length;
   const size = ctx.S.terSize && ctx.S.terSize !== 'auto' ? ctx.S.terSize : n <= 10 ? 'small' : n <= 22 ? 'medium' : 'large';
   const [W, H] = { small: [16, 9], medium: [20, 11], large: [24, 13] }[size];

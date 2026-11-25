@@ -13,6 +13,7 @@ const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 export function createTerPad({ box, getCode, pid, avatarSVG, toHost, getDir, canMove, active }) {
   let T = null, ver = null, roster = [], meIdx = -1, els = [];
   let me = null, team = 0, flags = 0, ink = 0, hist = [], lastStep = 0, lastMove = 0, askedAt = 0;
+  let free = false; // Capture the Flag: no painting, and you can walk anywhere
   const pending = new Map(); // tiles this iPad painted that the projector hasn't confirmed yet
   let shown = '';            // paint currently drawn, one digit per tile
 
@@ -29,7 +30,7 @@ export function createTerPad({ box, getCode, pid, avatarSVG, toHost, getDir, can
   function onMap(m) {
     const t = decodeMap(m); if (!t) return;
     const old = T && T.W === t.W && T.H === t.H ? shown : '';
-    T = t; ver = m.v; roster = Array.isArray(m.pl) ? m.pl : [];
+    T = t; ver = m.v; roster = Array.isArray(m.pl) ? m.pl : []; free = !!m.free;
     if (old) decodeOwn(T, old);
     const myTag = heroTag(getCode(), pid);
     meIdx = roster.findIndex(r => r && r[0] === myTag);
@@ -76,6 +77,17 @@ export function createTerPad({ box, getCode, pid, avatarSVG, toHost, getDir, can
       else { T.own[y][x] = team; unconfirmed++; }
     }
     repaint();
+    // markers: flags and jails (Capture the Flag)
+    const b = board();
+    b.querySelectorAll('.tp-mark').forEach(e => e.remove());
+    for (const mk of Array.isArray(m.mk) ? m.mk : []) {
+      if (!Array.isArray(mk)) continue;
+      const [kind, x, y] = mk, el = document.createElement('div');
+      el.className = 'tp-mark ' + String(kind).replace(/[^a-z0-9]/g, '');
+      el.textContent = kind[0] === 'f' ? '⚑' : '⛓';
+      el.style.left = ((x + 0.5) / T.W) * 100 + '%'; el.style.top = ((y + 0.5) / T.H) * 100 + '%';
+      b.append(el);
+    }
     const ps = Array.isArray(m.p) ? m.p : [];
     ps.forEach((p, i) => {
       if (!Array.isArray(p) || !els[i]) return;
@@ -104,8 +116,8 @@ export function createTerPad({ box, getCode, pid, avatarSVG, toHost, getDir, can
     lastStep = now;
     const [dx, dy] = DIRS[d], nx = me.x + dx, ny = me.y + dy;
     if (nx < 0 || ny < 0 || nx >= T.W || ny >= T.H || T.rock[ny][nx]) return;
-    if (isBase(T, nx) && nx !== (team === 1 ? 0 : T.W - 1)) return;
-    if (T.own[ny][nx] !== team) {
+    if (!free && isBase(T, nx) && nx !== (team === 1 ? 0 : T.W - 1)) return;
+    if (!free && T.own[ny][nx] !== team) {
       if (ink <= 0) return; // the projector will ask an ink question
       ink--;
       T.own[ny][nx] = team; pending.set(nx + ',' + ny, now); paintCell(T, nx, ny, 'pv');

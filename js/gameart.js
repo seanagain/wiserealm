@@ -63,10 +63,22 @@ function kart() {
   return g;
 }
 
+function ctf() {
+  const g = makeGrid(W, H);
+  fillRect(g, 0, 0, 23, H - 1, (x, y) => ((x >> 2) + (y >> 2)) % 2 ? '#c95a68' : '#d46a77');
+  fillRect(g, 24, 0, W - 1, H - 1, (x, y) => ((x >> 2) + (y >> 2)) % 2 ? '#5a86c9' : '#6a95d4');
+  fillRect(g, 23, 0, 24, H - 1, '#f4f1de');
+  for (const [x, c] of [[4, '#e63946'], [42, '#4361ee']]) { fillRect(g, x, 8, x, 22, '#5a3a24'); fillRect(g, x + (x < 24 ? 1 : -6), 8, x + (x < 24 ? 6 : -1), 13, c); }
+  fillRect(g, 0, 0, 7, 6, '#4a4560'); for (let x = 1; x < 7; x += 2) fillRect(g, x, 0, x, 6, '#9a93b5');
+  fillRect(g, 40, 0, 47, 6, '#4a4560'); for (let x = 41; x < 47; x += 2) fillRect(g, x, 0, x, 6, '#9a93b5');
+  fillRect(g, 18, 18, 21, 22, '#ffdcb8'); fillRect(g, 26, 18, 29, 22, '#ffdcb8');
+  return g;
+}
+
 export function gameArt(id) {
   if (id === 'raid') return bossSVG(0);
   if (id === 'maze') return `<div class="ga-maze">${svg(maze())}<div class="ga-mrc">${bossSVG(4)}</div></div>`;
-  const f = { corners, treasure, territory, kart }[id];
+  const f = { corners, treasure, territory, kart, ctf }[id];
   return f ? svg(f()) : '';
 }
 export { avatarSVG, px };

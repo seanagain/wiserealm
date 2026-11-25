@@ -27,12 +27,8 @@ function renderLib() {
       <h3>${esc(s.title)}</h3>
       <div class="muted">${cleanItems(s.items).length} questions · edited ${new Date(s.updated).toLocaleDateString()}</div>
       <div class="row">
-        <button class="btn primary small" data-play="${s.id}" data-game="raid">Boss Raid</button>
-        <button class="btn primary small" data-play="${s.id}" data-game="corners">Four Corners</button>
-        <button class="btn primary small" data-play="${s.id}" data-game="treasure">Treasure Hunt</button>
-        <button class="btn primary small" data-play="${s.id}" data-game="maze">Mr. C’s Maze</button>
-        <button class="btn primary small" data-play="${s.id}" data-game="territory">Territory Battle</button>
-        <button class="btn primary small" data-play="${s.id}" data-game="kart">Quiz Kart Rally</button>
+        <button class="btn primary" data-play="${s.id}">▶ Play</button>
+        <span class="muted" style="font-size:.85rem">Pick the game in the lobby</span>
       </div>
       <div class="row">
         <button class="btn small" data-edit="${s.id}">Edit</button>
@@ -42,7 +38,8 @@ function renderLib() {
     </div>`).join('') : '<p class="muted">No question sets yet. Click “New question set” to make one.</p>';
 }
 
-function play(id, game = 'raid') { location.href = `host.html?set=${encodeURIComponent(id)}&game=${encodeURIComponent(game)}`; }
+// The game is picked in the lobby (it starts with the last game you played).
+function play(id, game) { location.href = `host.html?set=${encodeURIComponent(id)}` + (game ? `&game=${encodeURIComponent(game)}` : ''); }
 
 function openEditor(set) {
   current = structuredClone(set);
