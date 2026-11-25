@@ -1113,11 +1113,32 @@ begin
     raise exception 'You can only visit villages of your own classes';
   end if;
   return jsonb_build_object('name', c.name,
+    'live', case when c.live_until > now() then jsonb_build_object('code', c.live_code, 'left', extract(epoch from c.live_until - now())::int) end,
     'teacher', (select jsonb_build_object('name', p.display_name, 'avatar', p.avatar, 'house', h.data, 'me', p.id = me)
       from public.profiles p left join public.houses h on h.user_id = p.id where p.id = c.teacher_id),
     'houses', coalesce((select jsonb_agg(jsonb_build_object('name', p.display_name, 'avatar', p.avatar, 'house', h.data, 'me', p.id = me) order by m.joined_at, p.id)
       from public.class_members m join public.profiles p on p.id = m.user_id left join public.houses h on h.user_id = m.user_id
       where m.class_id = p_class and m.user_id <> c.teacher_id), '[]'::jsonb));
+end $$;
+
+-- Live village (class time): the teacher switches it on for a while; their screen is the hub that
+-- passes everyone's walking along. The code names the live channel; only class members get it.
+alter table public.classes add column if not exists live_code text;
+alter table public.classes add column if not exists live_until timestamptz;
+create or replace function public.set_village_live(p_class uuid, p_minutes integer) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare c public.classes;
+begin
+  if not public.owns_class(p_class) then raise exception 'Not your class'; end if;
+  if coalesce(p_minutes, 0) <= 0 then
+    update public.classes set live_code = null, live_until = null where id = p_class;
+    return null;
+  end if;
+  update public.classes set
+    live_code = case when live_until > now() and live_code is not null then live_code else 'v' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 14) end,
+    live_until = now() + make_interval(mins => least(p_minutes, 90))
+    where id = p_class returning * into c;
+  return jsonb_build_object('code', c.live_code, 'left', extract(epoch from c.live_until - now())::int);
 end $$;
 
 -- Teacher: reset a student's house (just in case).
@@ -1131,8 +1152,10 @@ end $$;
 
 revoke all on function public.house_progress(uuid, text), public.house_item_ok(text, text, text[], text[], boolean),
   public.practice_streak(uuid, text) from public, anon, authenticated;
-revoke all on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid) from public, anon;
-grant execute on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid) to authenticated;
+revoke all on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid),
+  public.set_village_live(uuid, integer) from public, anon;
+grant execute on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid),
+  public.set_village_live(uuid, integer) to authenticated;
 
 -- ================= Name filter =================
 -- Blocks rude or sensitive names (English and Chinese) when students change their in-game name.

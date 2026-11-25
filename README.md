@@ -52,6 +52,12 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
   room (furniture is solid) and leave through the door at the bottom. Tapping a house walks there and
   goes in. This all happens on the student's own iPad: it uses **no live messages**, and other
   students' heroes stand by their own doors.
+- **🟢 Live village (class time):** open your class's village as the teacher and press **Start**
+  (10–45 minutes, +10 min to extend, auto-stops). Everyone then sees each other walking around,
+  in the village and inside houses. Your page is the hub: each iPad only reports when its hero
+  starts, stops or turns, and your page sends everyone one combined update a second (none while
+  nobody moves). Roughly 3,500 messages a minute with 30 students. Keep your page open while it's
+  live; students' pages notice within 30 seconds that it started.
 - **Only classmates in the same class** (and that class's teacher) can visit. They see the in-game
   name, hero and house. There are no messages or reactions.
 - **Furniture:** a few free starter pieces, more in the **Store** (25–400 coins), wallpapers and

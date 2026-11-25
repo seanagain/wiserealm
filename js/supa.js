@@ -122,6 +122,7 @@ const online = {
   saveHouse(house) { return this.rpc('save_house', { p_house: house }); },
   classVillage(cls) { return this.rpc('class_village', { p_class: cls }); },
   resetHouse(user) { return this.rpc('reset_house', { p_user: user }); },
+  setVillageLive(cls, minutes) { return this.rpc('set_village_live', { p_class: cls, p_minutes: minutes }); },
   getNameFilter() { return this.rpc('my_name_filter'); },
   setNameFilter(on, words) { return this.rpc('set_name_filter', { p_on: on, p_words: words }); },
   // solo practice
@@ -275,10 +276,18 @@ function demoHouses() {
       const p = demoProfile(), neighbors = load('wr_demo_neighbors', null) || NAMES.slice(0, 6).map((_, i) => fake(i));
       save('wr_demo_neighbors', neighbors);
       const me = d.members.some(m => m.class_id === cls && m.user_id === 'demo-user') ? [{ name: p.display_name, avatar: p.avatar, house: load('wr_demo_house', null), me: true }] : [];
-      return { name: c.name, teacher: { name: 'Your teacher', avatar: { cls: 1, hat: 3, color: 7 }, house: { wall: 'w_stars', floor: 'fl_carpet', ext: 1, items: [['f_bookshelf', 0, 3, 0], ['f_throne', 6, 5, 0], ['m_globe', 9, 4, 0], ['f_painting', 4, 0, 0], ['f_rug_star', 5, 6, 0]] }, me: false },
+      const live = c.live_until > Date.now() ? { code: c.live_code, left: Math.round((c.live_until - Date.now()) / 1000) } : null;
+      return { name: c.name, live, teacher: { name: 'Your teacher', avatar: { cls: 1, hat: 3, color: 7 }, house: { wall: 'w_stars', floor: 'fl_carpet', ext: 1, items: [['f_bookshelf', 0, 3, 0], ['f_throne', 6, 5, 0], ['m_globe', 9, 4, 0], ['f_painting', 4, 0, 0], ['f_rug_star', 5, 6, 0]] }, me: false },
         houses: [...me, ...neighbors] };
     },
     async resetHouse() { localStorage.removeItem('wr_demo_house'); return true; },
+    async setVillageLive(cls, minutes) {
+      const d = db(), c = d.classes.find(x => x.id === cls); if (!c) throw new Error('Not your class');
+      if (!(minutes > 0)) { c.live_code = null; c.live_until = 0; save('wr_demo_db', d); return null; }
+      if (!(c.live_until > Date.now()) || !c.live_code) c.live_code = 'v' + Math.random().toString(36).slice(2, 12);
+      c.live_until = Date.now() + Math.min(90, minutes) * 60000; save('wr_demo_db', d);
+      return { code: c.live_code, left: minutes * 60 };
+    },
   };
 }
 

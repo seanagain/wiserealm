@@ -856,3 +856,15 @@ body.emotes-on .play.active { padding-bottom: 92px; }
 .vpad { position: absolute; right: 10px; bottom: 10px; z-index: 8; margin: 0; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 4px; opacity: .92; }
 .vpad button { font-size: 1.3rem; }
 @media (hover: hover) and (pointer: fine) { .vpad { opacity: .75; } }
+/* Live village */
+.vlive { width: 100%; max-width: 1040px; gap: 10px; align-items: center; flex-wrap: wrap; background: #ecd9a8; color: #3a2410; border: 3px solid #5a3a24; padding: 6px 12px; box-shadow: 3px 3px 0 rgba(0, 0, 0, .35); }
+.vlive .muted { color: #7a5a30; }
+.vlive .live-cost { flex-basis: 100%; font-size: .82rem; }
+.vlive select { width: auto; padding: 4px 8px; }
+.live-dot { width: 12px; height: 12px; background: #e63946; border: 2px solid #5a1a22; animation: blinkInv .8s steps(2) infinite; }
+.vother { position: absolute; width: 4.2%; transform: translate(-50%, -96%); z-index: 5; pointer-events: none; transition: left .12s linear, top .12s linear; }
+.vother svg { width: 100%; height: auto; display: block; }
+.vother.face-left svg { transform: scaleX(-1); }
+.vother.walking svg { animation: walkbob .3s steps(2) infinite; }
+.vother span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(.5rem, 1.1vw, .7rem); font-weight: 700; background: #ecd9a8; color: #3a2410; border: 2px solid #5a3a24; padding: 0 4px; }
+.vother.in { width: 13%; }
