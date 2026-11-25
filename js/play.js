@@ -7,6 +7,7 @@ import { accounts } from './supa.js';
 import { usableEmotes } from './emotes.js';
 import { createTerPad } from './terpad.js';
 import { gameArt } from './gameart.js';
+import { createKartPad } from './kartpad.js';
 import { avatarSVG, normalizeAvatar, restrictAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES, STYLES } from './avatar.js';
 
 // One ID per device so a student who reloads keeps their score.
@@ -227,8 +228,11 @@ function onMsg(m) {
     } else {
       joined = false; $('#joinErr').textContent = m.reason || 'Could not join.'; show('s-join');
     }
+  } else if (m.t === 'kr' || m.t === 'ks') {
+    if (joined) kartPad().onMsg(m);
   } else if (m.t === 'mq' || m.t === 'mres') {
-    if (joined) mazeMsg(m);
+    if (joined && last && last.mode === 'kart') kartPad().onMsg(m);
+    else if (joined) mazeMsg(m);
   } else if (m.t === 'book') {
     if (joined && last && last.phase === 'lobby') openBook(m);
   } else if (m.t === 'tmap' || m.t === 'tt') {
@@ -302,6 +306,8 @@ function render(s) {
   document.querySelectorAll('.score-label').forEach(el => (el.textContent = s.scoreName || 'Score'));
   if (s.phase !== 'lobby') $('#bookView').hidden = true;
   $('#waitBook').hidden = !(s.phase === 'lobby' && s.book);
+  if (s.phase !== 'play' && kart && s.phase !== 'intro') kart.stop();
+  if (s.phase === 'intro' && s.mode === 'kart') { renderKart(s); return; }
   if (s.phase === 'lobby' || s.phase === 'intro') {
     myAns = -1; myPick = -1;
     renderTeamPick(s);
@@ -326,6 +332,8 @@ function render(s) {
       shownKey = key;
       renderQuestion(s);
     }
+  } else if (s.phase === 'play' && s.mode === 'kart') {
+    renderKart(s);
   } else if (s.phase === 'play') {
     renderMaze(s);
   } else if (s.phase === 'reveal') {
@@ -351,6 +359,20 @@ function render(s) {
     shownKey = key + (s.coins ? ':coins' : '');
     renderEnd(s);
   }
+}
+
+// Quiz Kart Rally: its own screen with the 3D-ish road view (js/kartpad.js).
+let kart = null;
+function kartPad() {
+  if (!kart) {
+    kart = createKartPad({ root: $('#kartRoot'), getCode: () => code, pid, avatarSVG, toHost, choiceStyle: CHOICE_STYLE, esc });
+    if (new URLSearchParams(location.search).has('debug')) window.__kart = kart.debug;
+  }
+  return kart;
+}
+function renderKart(s) {
+  if (shownKey !== 'kart') { shownKey = 'kart'; kartPad().reset(); show('s-kart'); }
+  kartPad().state(s);
 }
 
 // Voting for the next game (the teacher starts a vote in the lobby).

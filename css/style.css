@@ -868,3 +868,34 @@ body.emotes-on .play.active { padding-bottom: 92px; }
 .vother.walking svg { animation: walkbob .3s steps(2) infinite; }
 .vother span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(.5rem, 1.1vw, .7rem); font-weight: 700; background: #ecd9a8; color: #3a2410; border: 2px solid #5a3a24; padding: 0 4px; }
 .vother.in { width: 13%; }
+
+/* Quiz Kart Rally: projector map */
+.kr-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; height: 100%; min-height: 0; }
+.kr-map { position: relative; aspect-ratio: 1; height: 100%; max-height: calc(100vh - 200px); max-width: 100%; justify-self: center; border: 4px solid var(--ink); box-shadow: 0 0 0 4px var(--frame); }
+.kr-map canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.kr-kart { position: absolute; width: 4.6%; transform: translate(-50%, -80%); transition: left .1s linear, top .1s linear; z-index: 2; text-align: center; }
+.kr-kart .av-wrap { width: 100%; aspect-ratio: 26 / 24; filter: drop-shadow(0 0 2px #fff) drop-shadow(1px 2px 0 rgba(0,0,0,.5)); }
+.kr-kart .nm { font-size: 9px; background: var(--ink); padding: 0 3px; white-space: nowrap; margin-left: -60%; margin-right: -60%; }
+.kr-kart.busy::before { content: '?'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-family: var(--pixel); font-size: 10px; background: var(--gold); color: var(--ink); padding: 1px 4px; border: 2px solid var(--ink); }
+.kr-kart.fin { opacity: .6; }
+.kr-banana { position: absolute; transform: translate(-50%, -50%); font-size: 14px; z-index: 1; }
+@media (max-width: 1000px) { .kr-wrap { grid-template-columns: 1fr; } }
+/* Quiz Kart Rally: iPad */
+.kart-screen { padding: 0; justify-content: flex-start; }
+.kart-screen #kartRoot { width: 100%; max-width: 1100px; }
+.kp-view { position: relative; width: 100%; aspect-ratio: 320 / 200; max-height: 100dvh; margin: 0 auto; background: #000; touch-action: none; user-select: none; -webkit-user-select: none; overflow: hidden; }
+.kp-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.kp-hud { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; padding: 8px 12px; font-family: var(--pixel); font-size: clamp(.7rem, 2.4vw, 1.2rem); color: #fff; text-shadow: 2px 2px 0 #1b1430; pointer-events: none; }
+.kp-pos { color: var(--gold); font-size: 1.4em; }
+.kp-item { position: absolute; right: 12px; top: 46px; width: clamp(44px, 9vw, 70px); aspect-ratio: 1; background: rgba(27, 20, 48, .75); border: 3px solid #fff; display: grid; place-items: center; font-size: clamp(1.4rem, 4vw, 2.4rem); }
+.kp-msg { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); background: rgba(27, 20, 48, .85); color: #fff; padding: 8px 14px; border: 3px solid var(--gold); font-weight: 700; font-size: clamp(.9rem, 2.4vw, 1.3rem); text-align: center; max-width: 90%; pointer-events: none; }
+.kp-btn { position: absolute; bottom: 12px; width: clamp(70px, 16vw, 130px); height: clamp(70px, 16vw, 130px); font-size: clamp(1.6rem, 5vw, 3rem); background: rgba(59, 53, 117, .78); color: #fff; border: 4px solid var(--ink); box-shadow: var(--bevel); touch-action: none; }
+.kp-btn.held { background: var(--gold); color: var(--ink); }
+.kp-left { left: 12px; } .kp-right { left: calc(24px + clamp(70px, 16vw, 130px)); }
+.kp-use { right: 12px; font-family: var(--pixel); font-size: clamp(.7rem, 2vw, 1.1rem); opacity: .55; }
+.kp-use.ready { opacity: 1; background: #c0283f; animation: walkbob .5s steps(2) infinite; }
+.kp-q { position: absolute; inset: 6% 4%; background: rgba(27, 20, 48, .94); border: 4px solid var(--gold); padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; z-index: 5; }
+.kp-q[hidden] { display: none; }
+.kp-kind { font-family: var(--pixel); color: var(--gold); font-size: clamp(.7rem, 2vw, 1rem); }
+.kp-prompt { font-size: clamp(1.1rem, 3vw, 1.7rem); font-weight: 700; color: #fff; }
+.kp-choices { flex: 1; }

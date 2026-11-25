@@ -15,6 +15,7 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 | **Treasure Hunt** | A correct answer earns a dig. Diggers pick a spot on the island from their iPads to find gold, gems, chests… or a trap. Luck keeps it close. |
 | **Mr. C’s Maze** | (Optional **⚡ Edison Mode**: purple maze with lightning bolts to zap the Mr. C’s.) Students steer their heroes with arrow buttons on their iPads. Locked gates need a correct answer (everyone unlocks their own). A wild Mr. C roams the maze: if he catches you, answer right to bonk him away or lose a heart. Escape for a big bonus. Everyone plays at their own pace; settings for maze size, time limit and number of Mr. C’s. |
 | **Territory Battle** | Red team vs Blue team. Students walk with arrow buttons and paint the arena their color. Painting uses ink; when it runs out, a correct answer refills it. When two enemies bump into each other, both get the same question: the first right answer wins the duel, splashes paint and sends the other back to base. Most territory when time runs out wins. Each iPad shows the map with the student’s own hero marked YOU (one small update a second; can be turned off). Teams: random at the start, students pick on their iPads (teams must stay about even), or the teacher sorts them in the lobby. Settings: battlefield (country map with rivers, bridges and mountains; grass field; stone arena; or surprise me), time limit, arena size. |
+| **Quiz Kart Rally** | Everyone races karts around a track. Each iPad shows a 3D-style road view behind your kart (it drives itself forward; steer with ◀ ▶). Crossing the start line stops you at a **quiz gate**: a right answer gives a turbo boost, a wrong one a 3-second wait. Drive through **?** boxes to get a ⚡ Turbo or a 🍌 banana peel to drop behind you; anyone who slips on a peel must answer a question to drive on. Yellow boost pads speed you up. The projector shows the whole track from above with standings. Settings: laps (2–5), time limit. Each iPad reports its kart about once a second and the projector sends one combined update a second. |
 
 ## The pages
 
@@ -343,6 +344,9 @@ js/modes/maze.js       Mr. C's Maze
 js/lobby.js            lobby classroom playground
 js/terview.js          Territory Battle map drawing (shared by projector and iPads)
 js/terpad.js           Territory Battle map on the student iPad
+js/modes/kart.js       Quiz Kart Rally (projector)
+js/kartpad.js          Quiz Kart Rally 3D road view on the iPad
+js/karttrack.js        Quiz Kart Rally race track
 js/play.js             student iPad screens
 js/shop.js             the shop
 js/me.js               student profile page
