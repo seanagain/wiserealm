@@ -5,6 +5,8 @@ import { getSet, getSets, buildQuestions, cleanItems } from './sets.js';
 import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
 import { avatarSVG, normalizeAvatar, restrictAvatar, avatarColor, randomAvatar } from './avatar.js';
+import { blockedWord } from './namefilter.js';
+import { gameArt } from './gameart.js';
 import { createPlayground } from './lobby.js';
 import { sfx, isMuted, setMuted } from './sound.js';
 import { playEmote, bubbleHTML } from './emotes.js';
@@ -135,7 +137,11 @@ function stateMsg() {
   if (mode.publicState) Object.assign(s, mode.publicState(ctx));
   s.hud = mode.hud ? mode.hud(ctx) : '';
   s.emotes = S.emotes !== false;
-  if (G.phase === 'lobby') s.book = S.book !== false;
+  if (G.phase === 'lobby') {
+    s.book = S.book !== false;
+    if (G.vote) s.vote = { options: G.vote.options.map(id => ({ id, name: MODES[id].name })), left: Math.max(0, G.vote.endsAt - performance.now()) };
+    if (G.voteWinner) s.voteWinner = MODES[G.voteWinner] ? MODES[G.voteWinner].name : '';
+  }
   return s;
 }
 function broadcast() { send(stateMsg()); }
@@ -147,6 +153,7 @@ function onMsg(m) {
   else if (m.t === 'ans') handleAns(m);
   else if (m.t === 'sync') resync();
   else if (m.t === 'emote') handleEmote(m);
+  else if (m.t === 'vote') castVote(m);
   else if (m.t === 'dir' && G.phase === 'lobby') { const p = G.players.get(m.id); if (p) playground.setDir(p, m.d); }
   else if (mode.onMessage) mode.onMessage(ctx, m);
 }
@@ -166,6 +173,9 @@ function resync() {
 // could read those). Each signed-in iPad registers a random ticket for this game in the
 // database, sends only the ticket, and the projector looks it up with the teacher's login.
 const roster = new Map(), ticketOwner = new Map();
+// Name filter settings (teacher page). Until the teacher's own settings load, the built-in list is on.
+let nameFilter = { on: true, words: [] };
+async function loadNameFilter() { if (G.teacher) { try { nameFilter = Object.assign({ on: true, words: [] }, await accounts.getNameFilter()); } catch (e) { console.warn(e); } } }
 let pending = [], batchTimer = null, fetching = false;
 function lookupTicket(tk, fresh = false) {
   // fresh: ask the database again, e.g. a student rejoining after changing clothes in the shop.
@@ -229,6 +239,13 @@ async function handleJoin(m) {
     if (!signedIn) return send({ t: 'joined', to: id, ok: false, reason: `Someone is already using “${name}”. Try a different name!` });
     for (let n = 2; taken(finalName); n++) finalName = name.slice(0, 13) + ' ' + n;
   }
+  // Name filter: guests pick another name; a signed-in student's saved name is swapped for "Hero N".
+  let renamed = false;
+  if (nameFilter.on && blockedWord(finalName, nameFilter.words)) {
+    if (!signedIn) return send({ t: 'joined', to: id, ok: false, reason: 'That name isn’t allowed. Please choose a different name.' });
+    renamed = true;
+    for (let n = 1; ; n++) { finalName = 'Hero ' + n; if (!taken(finalName)) break; }
+  }
   const av = acct ? normalizeAvatar(restrictAvatar(acct.avatar || {}, acct.owned || [])) : normalizeAvatar(m.av);
   // One account can only play once per game (it can still rejoin from a new tab, keeping its score).
   let p = G.players.get(id);
@@ -242,7 +259,8 @@ async function handleJoin(m) {
     if (G.phase !== 'lobby' && mode.addPlayer) mode.addPlayer(ctx, p);
     sfx('join');
   } else { p.name = finalName; p.av = av; p.uid = uid || p.uid; }
-  if (acct) { p.owned = acct.owned || []; p.tk = tk; }
+  if (acct) { p.owned = acct.owned || []; p.tk = tk; p.real = acct.real_name || ''; }
+  p.filtered = renamed;
   send({ t: 'joined', to: id, ok: true, name: finalName, coinsOn: G.teacher && !!p.uid, state: stateMsg() });
   renderRoster();
   if (G.phase !== 'lobby' && mode.renderPlayers) mode.renderPlayers(ctx);
@@ -327,6 +345,7 @@ function sendBook(p) {
 }
 function renderRoster() {
   $('#playerCount').textContent = playerList().length;
+  renderPlayerList();
   playground.sync();
   const mp = $('#modePanel');
   if (mp && mode.lobbyPanel) mode.lobbyPanel(ctx, mp);
@@ -342,6 +361,131 @@ function refreshSigninHint() {
   $('#signinHint').textContent = !S.signin ? 'Guests can join with any name.'
     : G.teacher ? 'Only signed-in students can join. Guests see a “Sign in” button.'
     : 'Sign in as the teacher (below) to use this.';
+}
+
+// ---- Choosing the game: a picture grid, or a class vote on the iPads ----
+function chooseGame(id) {
+  if (!MODES[id]) return;
+  if (G.vote) endVote(true);
+  mode = MODES[id]; G.extra = {}; G.voteWinner = null;
+  applyChoice(); broadcast();
+}
+const voteOut = new Set(load('cq_vote_out', []));
+function openGamePick() {
+  $('#gpGrid').innerHTML = Object.values(MODES).map(m => `<div class="gp-card ${m.id === mode.id ? 'sel' : ''}" data-g="${m.id}" tabindex="0">
+      <div class="ga">${gameArt(m.id)}</div><b>${esc(m.name)}</b><p class="muted">${esc(m.blurb || '')}</p>
+      <label class="gp-in"><input type="checkbox" data-in="${m.id}" ${voteOut.has(m.id) ? '' : 'checked'}> In the vote</label></div>`).join('');
+  $('#gamePick').showModal();
+}
+$('#gpClose').onclick = () => $('#gamePick').close();
+$('#gpGrid').addEventListener('change', e => {
+  const c = e.target.closest('[data-in]'); if (!c) return;
+  if (c.checked) voteOut.delete(c.dataset.in); else voteOut.add(c.dataset.in);
+  save('cq_vote_out', [...voteOut]);
+});
+$('#gpGrid').addEventListener('click', e => {
+  if (e.target.closest('.gp-in')) return;
+  const card = e.target.closest('[data-g]'); if (!card) return;
+  chooseGame(card.dataset.g); $('#gamePick').close();
+});
+$('#voteStart').onclick = () => {
+  const options = Object.keys(MODES).filter(id => !voteOut.has(id));
+  if (options.length < 2) return alert('Pick at least two games for the vote.');
+  $('#gamePick').close();
+  startVote(options);
+};
+
+const VOTE_MS = 20000;
+let voteTick = null;
+function startVote(options) {
+  if (G.phase !== 'lobby') return;
+  G.vote = { options, votes: new Map(), endsAt: performance.now() + VOTE_MS };
+  G.voteWinner = null;
+  clearInterval(voteTick);
+  voteTick = setInterval(() => { if (!G.vote) return clearInterval(voteTick); if (performance.now() >= G.vote.endsAt) endVote(); else renderVote(); }, 250);
+  // test bots vote too, so the vote can be tried out
+  for (const p of playerList()) if (p.bot) later(() => castVote({ id: p.id, g: options[Math.floor(Math.random() * options.length)] }), 1000 + Math.random() * 9000);
+  sfx('warning');
+  renderVote(); broadcast();
+}
+function castVote(m) {
+  if (!G.vote || G.phase !== 'lobby') return;
+  const p = G.players.get(m.id);
+  if (!p || !G.vote.options.includes(m.g)) return;
+  G.vote.votes.set(p.id, m.g);
+  renderVote();
+}
+function endVote(cancel = false) {
+  const v = G.vote; if (!v) return;
+  G.vote = null; clearInterval(voteTick);
+  if (!cancel) {
+    const counts = v.options.map(id => [id, [...v.votes.values()].filter(g => g === id).length]);
+    const best = Math.max(...counts.map(c => c[1]));
+    if (best > 0) {
+      const top = counts.filter(c => c[1] === best).map(c => c[0]);
+      const win = top[Math.floor(Math.random() * top.length)];
+      mode = MODES[win]; G.extra = {}; applyChoice();
+      G.voteWinner = win;
+      sfx('crit'); confetti();
+      $('#votePanel').hidden = false;
+      $('#votePanel').innerHTML = `<div class="vote-win"><div class="ga">${gameArt(win)}</div><div><div class="muted">The class chose</div><b>🎉 ${esc(MODES[win].name)}!</b>
+        <div class="muted">${best} vote${best === 1 ? '' : 's'}${top.length > 1 ? ' (a tie, so a coin flip decided)' : ''}</div></div>
+        <button class="btn primary big" id="voteGo">Start game!</button><button class="btn small" id="voteHide">OK</button></div>`;
+      $('#voteGo').onclick = () => { $('#votePanel').hidden = true; startGame(); };
+      $('#voteHide').onclick = () => { $('#votePanel').hidden = true; };
+      broadcast();
+      return;
+    }
+  }
+  $('#votePanel').hidden = true;
+  broadcast();
+}
+function renderVote() {
+  const v = G.vote, el = $('#votePanel');
+  if (!v) return;
+  const left = Math.max(0, Math.ceil((v.endsAt - performance.now()) / 1000));
+  const total = v.votes.size, humans = playerList().length;
+  el.hidden = false;
+  el.innerHTML = `<div class="vote-head"><b>🗳 Vote for the next game on your iPad!</b><span class="vote-time">${left}s</span>
+      <span class="muted">${total} / ${humans} voted</span><span class="spacer"></span>
+      <button class="btn small primary" id="voteEnd">End vote now</button><button class="btn small" id="voteCancel">Cancel</button></div>
+    <div class="vote-bars">${v.options.map(id => {
+      const n = [...v.votes.values()].filter(g => g === id).length;
+      return `<div class="vote-row"><div class="ga">${gameArt(id)}</div><b>${esc(MODES[id].name)}</b>
+        <div class="vote-bar"><span style="width:${total ? (100 * n) / total : 0}%"></span></div><b class="vote-n">${n}</b></div>`;
+    }).join('')}</div>`;
+  $('#voteEnd').onclick = () => endVote();
+  $('#voteCancel').onclick = () => endVote(true);
+}
+
+// ---- Lobby player list (with real names on request, for checking who is who) ----
+let revealUntil = 0, revealTimer = null;
+function renderPlayerList() {
+  if (!$('#plist').open) return;
+  const reveal = performance.now() < revealUntil;
+  const list = playerList();
+  $('#plistTable').innerHTML = `<tr><th>#</th><th></th><th>In-game name</th><th>Account</th><th>Real name</th><th></th></tr>` +
+    (list.map((p, i) => `<tr><td>${i + 1}</td><td><span class="plist-hero">${avatarSVG(p.av)}</span></td>
+      <td><b>${esc(p.name)}</b>${p.filtered ? ' <span title="Their saved name was blocked by the name filter" class="bad">⚠ renamed</span>' : ''}</td>
+      <td>${p.bot ? '🤖 Test bot' : p.uid ? '✅ Signed in' : 'Guest'}</td>
+      <td>${p.uid ? (reveal ? esc(p.real || '(no name on account)') : '••••••') : '<span class="muted">-</span>'}</td>
+      <td><button class="btn small danger" data-kick="${esc(p.id)}">Remove</button></td></tr>`).join('') ||
+      '<tr><td colspan="6" class="muted">Nobody has joined yet.</td></tr>');
+  $('#revealNames').textContent = reveal ? '🙈 Hide real names' : '👁 Show real names';
+}
+$('#plist').addEventListener('toggle', renderPlayerList);
+$('#revealNames').onclick = () => {
+  revealUntil = performance.now() < revealUntil ? 0 : performance.now() + 15000;
+  clearTimeout(revealTimer); revealTimer = setTimeout(renderPlayerList, 15100);
+  renderPlayerList();
+};
+$('#plistTable').addEventListener('click', e => { const b = e.target.closest('[data-kick]'); if (b) kickPlayer(b.dataset.kick); });
+function kickPlayer(pid) {
+  const p = G.players.get(pid); if (!p) return;
+  if (!confirm(`Remove ${p.name} from this game?`)) return;
+  G.players.delete(p.id);
+  if (!p.bot) { G.kicked.add(p.id); send({ t: 'kicked', to: p.id }); }
+  renderRoster();
 }
 
 $('#roster').addEventListener('click', e => {
@@ -360,6 +504,7 @@ function applyChoice() {
   $$('.mode-name').forEach(e => (e.textContent = mode.name));
   $('#modeBlurb').textContent = mode.blurb || '';
   $('#setGame').value = mode.id;
+  $('#gameNowArt').innerHTML = gameArt(mode.id); $('#gameNowName').textContent = mode.name;
   $('#setSet').value = set.id;
   const n = cleanItems(set.items).length;
   $('#setCount').innerHTML = `<option value="0">All (${n})</option>` +
@@ -377,7 +522,8 @@ function applyChoice() {
 function setupLobby() {
   $('#setGame').innerHTML = Object.values(MODES).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
   $('#setSet').innerHTML = getSets().filter(s => cleanItems(s.items).length >= 2).map(s => `<option value="${esc(s.id)}">${esc(s.title)}</option>`).join('');
-  $('#setGame').onchange = () => { mode = MODES[$('#setGame').value] || raid; G.extra = {}; applyChoice(); broadcast(); };
+  $('#setGame').onchange = () => chooseGame($('#setGame').value);
+  $('#gameChange').onclick = openGamePick;
   $('#setSet').onchange = () => { set = getSet($('#setSet').value) || set; applyChoice(); };
   $('#joinUrl').textContent = joinBase.replace(/^https?:\/\//, '').replace(/index\.html$/, '');
   $('#joinCode').textContent = code;
@@ -449,6 +595,7 @@ async function setupTeacher() {
     await accounts.createGame(code, mode.id);
     G.teacher = true;
     roster.clear();
+    loadNameFilter();
     refreshSigninHint();
     // Students who joined before the teacher signed in: ask their iPads to register again.
     send({ t: 'reg' });
@@ -488,6 +635,8 @@ $('#openStudent').onclick = () => window.open(joinBase + 'index.html?join=' + co
 
 // ---------------- Game flow ----------------
 async function startGame() {
+  if (G.vote) endVote(true);
+  G.voteWinner = null; $('#votePanel').hidden = true;
   if (!G.players.size) return alert('Wait for at least one student to join (or add test bots).');
   const qs = bookQs && bookQs.length ? bookQs : buildQuestions(set, { count: S.count, flip: S.flip });
   bookQs = null;
@@ -725,6 +874,7 @@ function backToLobby() {
   show('lobbyScreen');
   refreshLooks();
   prepBook();
+  loadNameFilter();
 }
 $('#againBtn').onclick = backToLobby;
 $('#replayBtn').onclick = () => { backToLobby(); startGame(); };

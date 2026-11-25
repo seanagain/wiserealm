@@ -88,6 +88,14 @@
       <summary style="cursor:pointer;font-weight:700">📈 Free plan usage (shared by all teachers)</summary>
       <div id="usageBody" style="margin-top:12px"></div>
     </details>
+    <details class="card" style="padding:18px" id="filterBox">
+      <summary style="cursor:pointer;font-weight:700">🚫 Name filter (rude or sensitive names)</summary>
+      <p class="muted" style="font-size:.9rem">Blocks rude, sexual and hateful names in English and Chinese when students pick a game name or change their in-game name. Applies to your classes and your games.</p>
+      <label class="flex" style="gap:8px"><input type="checkbox" id="nfOn"> Filter names</label>
+      <p style="margin:12px 0 4px"><b>Extra words to block</b> <span class="muted">(one per line or separated by commas, English or Chinese)</span></p>
+      <textarea class="input" id="nfWords" rows="4" style="width:100%;font-size:1rem" placeholder="e.g. a nickname that's being used to tease someone"></textarea>
+      <div class="flex" style="margin-top:8px"><button class="btn primary" id="nfSave">Save</button><span class="muted" id="nfNote"></span></div>
+    </details>
     <details class="card" style="padding:18px" id="teachersBox">
       <summary style="cursor:pointer;font-weight:700">Teachers (add a colleague)</summary>
       <p class="muted" style="font-size:.9rem">Colleagues you add can sign in with Google and use WiseRealm with their own classes, question sets and students. They can’t see yours.</p>

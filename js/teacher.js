@@ -1,5 +1,6 @@
 import { $, esc, show, uid, fmt } from './common.js';
 import { accounts } from './supa.js';
+import { parseWords } from './namefilter.js';
 import { showClasses } from './classes.js';
 import { startCloudSync } from './cloudsets.js';
 import { getSets, getSet, upsertSet, deleteSet, newSet, parseTable, rowsToItems, cleanItems } from './sets.js';
@@ -323,6 +324,22 @@ async function renderUsage() {
   } catch (e) { box.textContent = e.message; }
 }
 $('#usageBox').addEventListener('toggle', () => { if ($('#usageBox').open) renderUsage(); });
+
+// ---- Name filter (rude or sensitive names) ----
+$('#filterBox').addEventListener('toggle', async () => {
+  if (!$('#filterBox').open) return;
+  try {
+    const f = await accounts.getNameFilter();
+    $('#nfOn').checked = f.on !== false; $('#nfWords').value = (f.words || []).join('\n'); $('#nfNote').textContent = '';
+  } catch (e) { $('#nfNote').textContent = e.message; }
+});
+$('#nfSave').onclick = async () => {
+  try {
+    const words = parseWords($('#nfWords').value);
+    await accounts.setNameFilter($('#nfOn').checked, words);
+    $('#nfWords').value = words.join('\n'); $('#nfNote').textContent = 'Saved ✓';
+  } catch (e) { $('#nfNote').textContent = e.message; }
+};
 $('#teachersBox').addEventListener('toggle', () => { if ($('#teachersBox').open) renderTeachers(); });
 
 renderBanner();

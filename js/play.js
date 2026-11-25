@@ -6,6 +6,7 @@ import { openRoom, isOnline } from './net.js';
 import { accounts } from './supa.js';
 import { usableEmotes } from './emotes.js';
 import { createTerPad } from './terpad.js';
+import { gameArt } from './gameart.js';
 import { avatarSVG, normalizeAvatar, restrictAvatar, randomAvatar, SKINS, COLORS, HATS, FACES, CLASSES, STYLES } from './avatar.js';
 
 // One ID per device so a student who reloads keeps their score.
@@ -273,7 +274,7 @@ let emoteCool = 0;
 function renderEmoteBar(s) {
   const bar = $('#emoteBar');
   const allowed = joined && s && s.emotes !== false && EMOTE_PHASES.includes(s.phase);
-  if (!allowed) { bar.hidden = true; return; }
+  if (!allowed) { bar.hidden = true; document.body.classList.remove('emotes-on'); return; }
   const list = usableEmotes(account ? account.prof.owned : []);
   const sig = list.map(e => e.id).join(',');
   if (bar.dataset.sig !== sig) {
@@ -282,6 +283,7 @@ function renderEmoteBar(s) {
       (account ? '<a class="hint" href="shop.html">More in the shop</a>' : '<span class="hint">Sign in to unlock more emotes</span>');
   }
   bar.hidden = false;
+  document.body.classList.add('emotes-on'); // keeps room at the bottom so the bar never covers the arrows
 }
 $('#emoteBar').addEventListener('click', e => {
   const b = e.target.closest('[data-e]'); if (!b || !last) return;
@@ -303,6 +305,7 @@ function render(s) {
   if (s.phase === 'lobby' || s.phase === 'intro') {
     myAns = -1; myPick = -1;
     renderTeamPick(s);
+    renderVotePick(s);
     if (shownKey === key) return;
     shownKey = key;
     showWait(s.phase === 'intro' ? text(s).intro : 'You’re in!',
@@ -350,6 +353,33 @@ function render(s) {
   }
 }
 
+// Voting for the next game (the teacher starts a vote in the lobby).
+let myVote = null, voteEnd = 0, voteSig = '', voteClock = null;
+function renderVotePick(s) {
+  const v = s.phase === 'lobby' && s.vote;
+  $('#votePick').hidden = !v;
+  $('#voteWon').hidden = !(s.phase === 'lobby' && !v && s.voteWinner);
+  if (!v && s.voteWinner) $('#voteWon').textContent = `🎉 The class chose ${s.voteWinner}!`;
+  $('#lobbyPad').hidden = !!v || !(s.phase === 'lobby');
+  if (!v) { clearInterval(voteClock); voteSig = ''; return; }
+  voteEnd = performance.now() + (v.left || 0);
+  const sig = v.options.map(o => o.id).join(',');
+  if (sig !== voteSig) {
+    voteSig = sig; myVote = null;
+    $('#voteOpts').innerHTML = v.options.map(o => `<button class="vote-opt" data-vote="${esc(o.id)}"><span class="ga">${gameArt(o.id)}</span><b>${esc(o.name)}</b></button>`).join('');
+  }
+  clearInterval(voteClock);
+  const tick = () => { const left = Math.max(0, Math.ceil((voteEnd - performance.now()) / 1000)); $('#voteLeft').textContent = `${left}s`; };
+  tick(); voteClock = setInterval(tick, 500);
+}
+$('#voteOpts').addEventListener('click', e => {
+  const b = e.target.closest('[data-vote]'); if (!b) return;
+  myVote = b.dataset.vote;
+  toHost({ t: 'vote', id: pid, g: myVote });
+  document.querySelectorAll('#voteOpts .vote-opt').forEach(x => x.classList.toggle('sel', x === b));
+  $('#voteNote').textContent = 'Vote sent! You can still change it.';
+});
+
 // The lobby book: a preview of the game's questions (sent when the hero walks to the podium).
 function openBook(m) {
   if (!Array.isArray(m.qs)) return;
@@ -393,7 +423,7 @@ function showWait(title, sub, lobby = false) {
   $('#waitSignIn').hidden = !!account;
   $('#waitClass').textContent = classNote;
   $('#waitClass').hidden = !classNote;
-  $('#lobbyPad').hidden = !lobby;
+  $('#lobbyPad').hidden = !lobby || !$('#votePick').hidden;
   $('#s-wait').classList.toggle('with-pad', lobby);
   if (!lobby) setDir(null);
   $('#waitHero').innerHTML = avatarSVG(profile.av);
@@ -560,6 +590,17 @@ for (const dpad of document.querySelectorAll('.dpad')) {
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => dpad.addEventListener(ev, () => setDir(null)));
   dpad.addEventListener('contextmenu', e => e.preventDefault());
 }
+// iPad Safari zooms in on fast double taps (and pinches) even with the viewport set: stop that
+// while playing. Text boxes still work normally.
+let lastTouch = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  // Buttons are protected by CSS (touch-action), so only quick taps on empty areas are stopped here.
+  if (now - lastTouch < 350 && !e.target.closest('button, .choice, [data-d], [data-e], input, textarea, select, a, label')) e.preventDefault();
+  lastTouch = now;
+}, { passive: false });
+for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+
 const KEYS = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', w: 'u', s: 'd', a: 'l', d: 'r' };
 const padActive = () => ($('#s-maze').classList.contains('active') && !$('#dpad').hidden) || ($('#s-wait').classList.contains('active') && !$('#lobbyPad').hidden && $('#bookView').hidden);
 document.addEventListener('keydown', e => { if (padActive() && KEYS[e.key]) { e.preventDefault(); setDir(KEYS[e.key]); } });

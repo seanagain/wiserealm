@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="WiseRealm">
@@ -54,6 +54,12 @@
   <h2 style="margin:0" id="waitTitle">You’re in!</h2>
   <p class="muted" id="waitSub" style="font-size:1.15rem;margin:0">Look at the big screen. Your teacher will start soon.</p>
   <p class="good-note" id="waitClass" hidden></p>
+  <div class="card vote-pick" id="votePick" hidden>
+    <b>🗳 Vote for the next game! <span id="voteLeft"></span></b>
+    <div class="vote-opts" id="voteOpts"></div>
+    <span class="muted" id="voteNote">Tap a game. You can change your vote until time runs out.</span>
+  </div>
+  <p class="good-note" id="voteWon" hidden></p>
   <p class="book-hint" id="waitBook" hidden>📖 Walk your hero to the <b>book on the podium</b> to preview the questions!</p>
   <div class="card team-pick" id="teamPick" hidden>
     <b id="teamPickTitle">Pick your team!</b>

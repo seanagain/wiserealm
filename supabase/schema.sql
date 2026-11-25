@@ -900,6 +900,7 @@ declare prof public.profiles;
 begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
   perform public.my_profile();
+  perform public.check_student_name(auth.uid(), public.clean_name(p_name));
   update public.profiles set display_name = public.clean_name(p_name) where id = auth.uid() returning * into prof;
   return prof;
 end $$;
@@ -1132,6 +1133,83 @@ revoke all on function public.house_progress(uuid, text), public.house_item_ok(t
   public.practice_streak(uuid, text) from public, anon, authenticated;
 revoke all on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid) from public, anon;
 grant execute on function public.my_house(text), public.save_house(jsonb), public.class_village(uuid), public.reset_house(uuid) to authenticated;
+
+-- ================= Name filter =================
+-- Blocks rude or sensitive names (English and Chinese) when students change their in-game name.
+-- On by default. A teacher can switch it off or add extra words (teacher page); a student is
+-- checked with the words of every teacher whose class they're in.
+create table if not exists public.teacher_settings (
+  teacher_id uuid primary key references auth.users (id) on delete cascade,
+  name_filter boolean not null default true,
+  blocked_words text[] not null default '{}'
+);
+alter table public.teacher_settings enable row level security; -- only through the functions below
+
+-- BEGIN NAME FILTER
+-- (generated from js/namefilter.js by tools/gen-shop-sql.mjs)
+create or replace function public.name_filter_contains() returns text[] language sql immutable as $$ select array['fuck', 'fuk', 'fck', 'fvck', 'shit', 'bitch', 'biatch', 'cunt', 'pussy', 'whore', 'slut', 'bastard', 'asshole', 'dumbass', 'butthole', 'motherf', 'nigger', 'nigga', 'faggot', 'retard', 'porn', 'penis', 'vagina', 'rapist', 'boob', 'piss', 'dildo', 'hitler', 'killyourself', 'tranny', 'blowjob', 'handjob', 'jerkoff', 'wank', 'twat', 'horny', 'nude', 'naked', '幹你', '干你', '幹您', '操你', '肏', '屌', '靠北', '靠杯', '靠腰', '雞掰', '鸡掰', '機掰', '机掰', '雞巴', '鸡巴', '他媽', '他妈', '你媽', '你妈', '媽的', '妈的', '去死', '白痴', '白癡', '智障', '腦殘', '脑残', '婊子', '賤人', '贱人', '王八蛋', '混蛋', '傻逼', '傻屄', '屄', '草泥馬', '草泥马', '尼瑪', '尼玛', '三小', '北七', '廢物', '废物', '屁眼', '色情', '做愛', '做爱', '性交', '陰莖', '阴茎', '陰道', '阴道', '奶子', '強姦', '强奸', '自殺', '自杀', '支那', '黑鬼', '垃圾人', '死胖子', '蠢貨', '蠢货']::text[] $$;
+create or replace function public.name_filter_exact() returns text[] language sql immutable as $$ select array['ass', 'dick', 'cock', 'sex', 'sexy', 'cum', 'tit', 'tits', 'butt', 'damn', 'hell', 'crap', 'rape', 'nazi', 'kys', 'stfu', 'wtf', 'chink', 'spic', 'kike', 'gook', 'niga', 'fag', 'hoe', 'thot', 'pedo', 'anal', '幹', '操', '屎', '屁', '賤', '贱', '婊', '滾', '滚', '豬', '猪', '笨蛋', '垃圾']::text[] $$;
+-- END NAME FILTER
+
+-- Lower case, digits/symbols used as letters (0→o, 1→i, @→a...), then spaces and symbols removed.
+create or replace function public.name_leet(p text) returns text language sql immutable as $$
+  select translate(lower(coalesce(p, '')), '013457@$!', 'oieastasi');
+$$;
+create or replace function public.name_norm(p text) returns text language sql immutable as $$
+  select regexp_replace(public.name_leet(p), '[[:space:]0-9!-/:-@\[-`{-~]', '', 'g');
+$$;
+create or replace function public.name_blocked(p_name text, p_extra text[]) returns boolean
+language plpgsql immutable as $$
+declare c text := public.name_norm(p_name); coll text; toks text[]; w text;
+begin
+  if c = '' then return false; end if;
+  coll := regexp_replace(c, '(.)\1+', '\1', 'g');
+  toks := regexp_split_to_array(public.name_leet(p_name), '[[:space:]0-9!-/:-@\[-`{-~]+');
+  foreach w in array public.name_filter_contains() || coalesce((select array_agg(public.name_norm(x)) from unnest(p_extra) x), '{}') loop
+    if w <> '' and (position(w in c) > 0 or (w = regexp_replace(w, '(.)\1+', '\1', 'g') and position(w in coll) > 0)) then return true; end if;
+  end loop;
+  foreach w in array public.name_filter_exact() loop
+    if w = any (toks) or c = w then return true; end if;
+  end loop;
+  return false;
+end $$;
+
+-- Teacher: my filter setting and extra words.
+create or replace function public.my_name_filter() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  return coalesce((select jsonb_build_object('on', name_filter, 'words', to_jsonb(blocked_words)) from public.teacher_settings where teacher_id = auth.uid()),
+    jsonb_build_object('on', true, 'words', '[]'::jsonb));
+end $$;
+create or replace function public.set_name_filter(p_on boolean, p_words text[]) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare w text[];
+begin
+  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  select coalesce(array_agg(distinct x), '{}') into w from (select lower(trim(x)) x from unnest(coalesce(p_words, '{}')) x limit 200) t where length(x) between 1 and 30;
+  insert into public.teacher_settings (teacher_id, name_filter, blocked_words) values (auth.uid(), coalesce(p_on, true), w)
+    on conflict (teacher_id) do update set name_filter = excluded.name_filter, blocked_words = excluded.blocked_words;
+  return true;
+end $$;
+
+-- Is this name allowed for this student? (Filter is on unless all their classes' teachers turned it off.)
+create or replace function public.check_student_name(p_user uuid, p_name text) returns void
+language plpgsql stable security definer set search_path = public as $$
+declare on_ boolean; words text[];
+begin
+  select bool_or(coalesce(ts.name_filter, true)) into on_ from public.class_members m join public.classes c on c.id = m.class_id
+    left join public.teacher_settings ts on ts.teacher_id = c.teacher_id where m.user_id = p_user and not c.archived;
+  if not coalesce(on_, true) then return; end if;
+  select coalesce(array_agg(distinct w), '{}') into words from public.class_members m join public.classes c on c.id = m.class_id
+    join public.teacher_settings ts on ts.teacher_id = c.teacher_id and ts.name_filter, unnest(ts.blocked_words) w
+    where m.user_id = p_user and not c.archived;
+  if public.name_blocked(p_name, words) then raise exception 'That name isn''t allowed. Please choose a different one.'; end if;
+end $$;
+
+revoke all on function public.check_student_name(uuid, text) from public, anon, authenticated;
+revoke all on function public.my_name_filter(), public.set_name_filter(boolean, text[]) from public, anon;
+grant execute on function public.my_name_filter(), public.set_name_filter(boolean, text[]) to authenticated;
 
 -- ---------- Shop catalog (generated from js/items.js and js/furniture.js by tools/gen-shop-sql.mjs) ----------
 -- BEGIN SHOP ITEMS

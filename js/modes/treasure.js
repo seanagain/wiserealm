@@ -18,7 +18,8 @@ const NAMES = { C: 'a treasure chest', G: 'a gem', g: 'gold', T: 'a trap', '.': 
 function newIsland() {
   const bag = [...'CCC', ...'GGGGGGGG', ...'g'.repeat(26), ...'.'.repeat(17), ...'TTTTTT'];
   for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
-  return bag.map(t => ({ t, v: t === 'C' ? 200 : t === 'G' ? 100 : t === 'g' ? 30 + 5 * Math.floor(Math.random() * 7) : t === 'T' ? -50 : 0, dug: false }));
+  // Chest 150, gem 75, gold 20–45, trap −40 (lowered a bit: scores were running high).
+  return bag.map(t => ({ t, v: t === 'C' ? 150 : t === 'G' ? 75 : t === 'g' ? 20 + 5 * Math.floor(Math.random() * 6) : t === 'T' ? -40 : 0, dug: false }));
 }
 
 function renderIsland(ctx) {

@@ -41,11 +41,25 @@
         <span class="muted" style="font-size:.9rem">Click a hero to remove them.</span>
         <button class="btn small" id="lockBtn" title="Stop new people from joining (students already in can still rejoin)">🔓 Room open</button>
       </div>
+      <details class="plist" id="plist">
+        <summary>👥 Player list</summary>
+        <div class="flex plist-tools">
+          <button class="btn small" id="revealNames">👁 Show real names</button>
+          <span class="muted" id="revealNote">Real names show for 15 seconds. The class can see this screen!</span>
+        </div>
+        <div class="plist-scroll"><table class="plist-table" id="plistTable"></table></div>
+      </details>
+      <div class="vote-panel" id="votePanel" hidden></div>
       <div class="tm-panel" id="modePanel" hidden></div>
       <div class="roster" id="roster"></div>
     </div>
     <div class="card side">
-      <label>Game <select id="setGame"></select></label>
+      <select id="setGame" hidden></select>
+      <div class="game-now">
+        <div class="ga" id="gameNowArt"></div>
+        <div class="grow"><div class="muted" style="font-size:.8rem">Game</div><b id="gameNowName"></b></div>
+        <button class="btn small primary" id="gameChange">Change</button>
+      </div>
       <label>Question set <select id="setSet" style="max-width:190px"></select></label>
       <p class="muted" id="modeBlurb" style="margin:-4px 0 0;font-size:.9rem"></p>
       <label>Time per question <select id="setTime">
@@ -134,6 +148,15 @@
     </div>
   </div>
 </section>
+
+<dialog id="gamePick" class="game-pick">
+  <div class="flex" style="align-items:center"><h2 style="flex:1;margin:0">🎮 Choose a game</h2><button class="btn small" id="gpClose">Close ✕</button></div>
+  <div class="gp-grid" id="gpGrid"></div>
+  <div class="flex gp-vote">
+    <button class="btn primary big" id="voteStart">🗳 Let students vote</button>
+    <span class="muted">Students vote on their iPads for 20 seconds. Untick a game to leave it out of the vote.</span>
+  </div>
+</dialog>
 
 <div class="overlay" id="intro"><div class="intro-text" id="introText"></div></div>
 

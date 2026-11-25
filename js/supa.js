@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 import { load, save } from './common.js';
 import { ITEM_BY_ID, ITEMS } from './items.js';
 import { PREMIUM_SLOTS, randomAvatar } from './avatar.js';
+import { blockedWord } from './namefilter.js';
 import { HOUSE_BY_ID, MILESTONES, FURNITURE, EXTERIORS, normalizeHouse, canUse } from './furniture.js';
 
 export const isOnline = () => !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
@@ -121,6 +122,8 @@ const online = {
   saveHouse(house) { return this.rpc('save_house', { p_house: house }); },
   classVillage(cls) { return this.rpc('class_village', { p_class: cls }); },
   resetHouse(user) { return this.rpc('reset_house', { p_user: user }); },
+  getNameFilter() { return this.rpc('my_name_filter'); },
+  setNameFilter(on, words) { return this.rpc('set_name_filter', { p_on: on, p_words: words }); },
   // solo practice
   assignSet(cls, set, on) { return this.rpc('assign_set', { p_class: cls, p_set: set, p_on: on }); },
   classAssignedSets(cls) { return this.rpc('class_assigned_sets', { p_class: cls }); },
@@ -218,7 +221,13 @@ const demo = {
   async playersOwned(uids) { const p = demoProfile(); return uids.includes(p.id) ? [{ id: p.id, owned: p.owned }] : []; },
   ...demoPractice(),
   ...demoHouses(),
-  async setDisplayName(name) { const p = demoProfile(); p.display_name = demoCleanName(name); save(DEMO_KEY, p); return p; },
+  async setDisplayName(name) {
+    const p = demoProfile(), n = demoCleanName(name), f = load('wr_demo_namefilter', { on: true, words: [] });
+    if (f.on && blockedWord(n, f.words)) throw new Error('That name isn’t allowed. Please choose a different one.');
+    p.display_name = n; save(DEMO_KEY, p); return p;
+  },
+  async getNameFilter() { return load('wr_demo_namefilter', { on: true, words: [] }); },
+  async setNameFilter(on, words) { save('wr_demo_namefilter', { on: !!on, words }); return true; },
   async renameStudent(_u, name) { const p = demoProfile(); p.display_name = demoCleanName(name); save(DEMO_KEY, p); return p.display_name; },
 };
 

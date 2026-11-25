@@ -242,6 +242,18 @@ coins and items. Nothing else. No passwords are ever seen by WiseRealm.
 - **Auto-next** can be turned on/off during a game with the **⏩ Auto-next** button.
 - **Lobby playground:** while waiting, students walk their heroes around a pixel classroom on the
   projector with the arrow pad on their iPad, and send emotes. Click a hero to remove them.
+- **🎮 Choose a game:** the **Change** button in the lobby opens a grid of all the games with a
+  picture of each. **🗳 Let students vote** puts the games (untick any you want to leave out) on
+  every iPad for 20 seconds; the projector shows live bars, and the winner is picked automatically
+  (a tie is a coin flip). Press **Start game!** when you're ready.
+- **👥 Player list** (above the classroom): everyone in the game, signed in or guest, with a Remove
+  button. **👁 Show real names** shows signed-in students' real names for 15 seconds (remember the
+  class can see the projector).
+- **🚫 Name filter** (teacher page, on by default): rude or sensitive names in English and Chinese
+  are blocked. Guests are asked to pick another name; a signed-in student whose saved name is blocked
+  plays as "Hero 1" (marked ⚠ in the player list) and can't save such a name on their profile.
+  Add your own words (e.g. a nickname used to tease someone) on the teacher page. Students in your
+  classes are checked with your words.
 - **Lobby book 📖** (lobby setting, on by default): a book on a podium in the classroom. When a
   student walks their hero up to it, their iPad shows a preview of this game's questions (the same
   questions the game will ask, in a different order). Seeing the questions first helps memory.

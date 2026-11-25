@@ -4,6 +4,7 @@
 import fs from 'fs';
 import { ITEMS } from '../js/items.js';
 import { HOUSE_ITEMS } from '../js/furniture.js';
+import { CONTAINS, EXACT } from '../js/namefilter.js';
 
 const ALL = [...ITEMS, ...HOUSE_ITEMS];
 const file = new URL('../supabase/schema.sql', import.meta.url);
@@ -16,6 +17,12 @@ ${rows}
 on conflict (id) do update set slot = excluded.slot, name = excluded.name, price = excluded.price, milestone = excluded.milestone;
 delete from public.shop_items where id not in (${ALL.map(i => q(i.id)).join(', ')});
 -- END SHOP ITEMS`;
-const out = sql.replace(/-- BEGIN SHOP ITEMS[\s\S]*?-- END SHOP ITEMS/, block);
+const arr = list => `array[${list.map(q).join(', ')}]::text[]`;
+const nf = `-- BEGIN NAME FILTER
+-- (generated from js/namefilter.js by tools/gen-shop-sql.mjs)
+create or replace function public.name_filter_contains() returns text[] language sql immutable as $$ select ${arr(CONTAINS)} $$;
+create or replace function public.name_filter_exact() returns text[] language sql immutable as $$ select ${arr(EXACT)} $$;
+-- END NAME FILTER`;
+const out = sql.replace(/-- BEGIN SHOP ITEMS[\s\S]*?-- END SHOP ITEMS/, () => block).replace(/-- BEGIN NAME FILTER[\s\S]*?-- END NAME FILTER/, () => nf);
 fs.writeFileSync(file, out);
-console.log(`Wrote ${ALL.length} shop items into supabase/schema.sql`);
+console.log(`Wrote ${ALL.length} shop items and the name filter (${CONTAINS.length + EXACT.length} words) into supabase/schema.sql`);
