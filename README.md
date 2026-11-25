@@ -381,3 +381,11 @@ then run `supabase/schema.sql` again in the Supabase SQL Editor.
 3. ✅ Treasure Hunt
 4. ✅ Google sign-in, coins and the item shop
 5. Next ideas: question sets saved to your account, class rosters, more games and items
+
+## License
+
+WiseRealm's own code and artwork are © 2026 WiseRealm and licensed under the
+**PolyForm Noncommercial License 1.0.0** (see `LICENSE.md`): teachers and schools may use and change
+it for free for non-commercial purposes, but nobody may sell it or make money from it without
+permission. Third-party files in `vendor/` (MIT) and `fonts/` (SIL Open Font License) keep their own
+licenses. The rules for using the website are in `terms.html` (Terms of Use).
