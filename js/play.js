@@ -424,8 +424,10 @@ function renderTeamPick(s) {
   if (box.hidden) return;
   const mine = (s.teams && s.teams[pid]) || 0, size = s.tsize || [0, 0, 0];
   const name = ['', '🟥 Red', '🟦 Blue'];
-  $('#teamBtns').hidden = how !== 'pick';
-  $('#teamPickTitle').textContent = how === 'pick' ? (mine ? `You’re on ${name[mine]}! Tap to switch.` : 'Pick your team!') : (mine ? `You’re on ${name[mine]}!` : 'Your teacher is choosing teams…');
+  const locked = how === 'pick' && s.locked;
+  $('#teamBtns').hidden = how !== 'pick' || locked;
+  $('#teamPickTitle').textContent = locked ? (mine ? `🔒 Teams are locked. You’re on ${name[mine]}!` : '🔒 Teams are locked. Your teacher will put you on a team.')
+    : how === 'pick' ? (mine ? `You’re on ${name[mine]}! Tap to switch.` : 'Pick your team!') : (mine ? `You’re on ${name[mine]}!` : 'Your teacher is choosing teams…');
   let full = false;
   box.querySelectorAll('[data-team]').forEach(b => {
     const t = +b.dataset.team, other = 3 - t;
@@ -434,7 +436,7 @@ function renderTeamPick(s) {
     b.textContent = `${name[t]} · ${size[t]}${isFull ? ' (full for now)' : ''}`;
     full = full || isFull;
   });
-  $('#teamPickNote').textContent = how === 'pick' ? (full ? 'Teams must stay even. Wait for someone to join the other team.' : 'Teams must stay about even.') : '';
+  $('#teamPickNote').textContent = locked ? '' : how === 'pick' ? (full ? 'Teams must stay even. Wait for someone to join the other team.' : 'Teams must stay about even.') : '';
 }
 $('#teamBtns').addEventListener('click', e => {
   const b = e.target.closest('[data-team]'); if (!b || b.disabled) return;

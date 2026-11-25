@@ -483,6 +483,7 @@ export default {
     el.innerHTML = `<div class="tm-head"><b>${how === 'pick' ? '📱 Students pick a team on their iPads.' : '👆 Click a name to move them.'}</b>
         <span class="muted">${how === 'pick' ? 'Click a name to move them.' : ''} No team yet = put on the smaller team at the start.</span>
         <span class="spacer"></span>
+        ${how === 'pick' ? `<button class="btn small ${ctx.G.teamsLocked ? 'primary' : ''}" data-tact="lock" title="Stop students switching teams">${ctx.G.teamsLocked ? '🔒 Teams locked' : '🔓 Lock teams'}</button>` : ''}
         <button class="btn small" data-tact="even">⚖ Even out</button><button class="btn small" data-tact="shuffle">🔀 Shuffle</button><button class="btn small" data-tact="clear">Clear</button></div>
       <div class="tm-cols">
         <div class="tm-col red"><h3>🟥 Red · ${on(1).length}</h3>${names(1)}</div>
@@ -494,7 +495,8 @@ export default {
       if (nm) { const p = ctx.G.players.get(nm.dataset.tm); if (p) p.team = p.team === 1 ? 2 : 1; }
       else if (act) {
         const a = act.dataset.tact;
-        if (a === 'clear') for (const p of list) p.team = 0;
+        if (a === 'lock') ctx.G.teamsLocked = !ctx.G.teamsLocked;
+        else if (a === 'clear') for (const p of list) p.team = 0;
         else if (a === 'shuffle') {
           const l = list.slice();
           for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; }
@@ -514,7 +516,7 @@ export default {
   onMessage(ctx, m) {
     if (m.t === 'team' && ctx.G.phase === 'lobby') {
       const p = ctx.G.players.get(m.id), t = +m.team;
-      if (!p || ctx.S.terTeams !== 'pick' || (t !== 1 && t !== 2) || p.team === t) return;
+      if (!p || ctx.S.terTeams !== 'pick' || ctx.G.teamsLocked || (t !== 1 && t !== 2) || p.team === t) return;
       const size = k => ctx.players().filter(q => q !== p && q.team === k).length;
       if (size(t) >= size(3 - t) + 2) return; // that team is full for now
       p.team = t;
@@ -538,7 +540,7 @@ export default {
     if (ctx.G.phase === 'lobby') {
       const how = ctx.S.terTeams || 'random', list = ctx.players();
       if (how === 'random') return { teamPick: 'random' };
-      return { teamPick: how, teams: Object.fromEntries(list.filter(p => !p.bot).map(p => [p.id, p.team || 0])), tsize: [0, 1, 2].map(t => list.filter(p => (p.team || 0) === t).length) };
+      return { teamPick: how, locked: !!ctx.G.teamsLocked, teams: Object.fromEntries(list.filter(p => !p.bot).map(p => [p.id, p.team || 0])), tsize: [0, 1, 2].map(t => list.filter(p => (p.team || 0) === t).length) };
     }
     return T && T.endAt ? { left: Math.max(0, T.endAt - performance.now()), pads: padsOn(ctx) } : { pads: padsOn(ctx) };
   },
