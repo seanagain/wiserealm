@@ -47,6 +47,11 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
   teacher's) castle on the hill, a river with a stone bridge, a cobblestone high street with a
   timber-framed cottage for each student, a pond, a well, and forest all around. Each class always
   gets the same scenery.
+- **Walk around:** students walk their own hero through the village with the arrow pad (or arrow
+  keys, or by tapping where to go). Walking up to a front door goes inside: they can walk around the
+  room (furniture is solid) and leave through the door at the bottom. Tapping a house walks there and
+  goes in. This all happens on the student's own iPad: it uses **no live messages**, and other
+  students' heroes stand by their own doors.
 - **Only classmates in the same class** (and that class's teacher) can visit. They see the in-game
   name, hero and house. There are no messages or reactions.
 - **Furniture:** a few free starter pieces, more in the **Store** (25–400 coins), wallpapers and

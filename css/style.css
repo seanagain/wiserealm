@@ -834,3 +834,25 @@ body.emotes-on .play.active { padding-bottom: 92px; }
 .vote-opt .ga { width: 100%; display: block; }
 .vote-opt .ga .boss-svg { width: 64%; margin: 0 auto; }
 .vote-opt.sel { box-shadow: 0 0 0 4px var(--gold); background: #2d2860; }
+/* Walkable village */
+.vview { position: relative; width: 100%; max-width: 1040px; overflow: hidden; border: 6px solid #5a3a24; box-shadow: 0 0 0 4px #8f5a2e, 0 0 0 8px var(--ink), 8px 10px 0 8px rgba(0, 0, 0, .35); background: #3f7a35; touch-action: none; user-select: none; -webkit-user-select: none; }
+.vworld { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
+.vworld canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+.vme { position: absolute; width: 4.2%; transform: translate(-50%, -96%); z-index: 6; pointer-events: none; filter: drop-shadow(0 0 2px #fff) drop-shadow(1px 2px 0 rgba(0, 0, 0, .4)); }
+.vme svg { width: 100%; height: auto; display: block; }
+.vme.face-left svg { transform: scaleX(-1); }
+.vme.walking svg { animation: walkbob .3s steps(2) infinite; }
+.vme::after { content: 'YOU'; position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font-family: var(--pixel); font-size: 8px; color: var(--ink); background: var(--gold); padding: 1px 3px; border: 2px solid var(--ink); }
+.vroom { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; background: #2a1f14; }
+.vroom[hidden], .vworld[hidden] { display: none; }
+.vroom-head { width: 100%; display: flex; align-items: center; gap: 10px; color: #ecd9a8; font-size: 1.1rem; }
+.vroom-box { position: relative; aspect-ratio: 96 / 72; flex: none; border: 4px solid var(--ink); box-shadow: 0 0 0 3px #8f5a2e; cursor: pointer; }
+.vroom-box svg { display: block; width: 100%; height: 100%; }
+.vroom-box .vme { width: 13%; }
+.vexit { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 17%; text-align: center; font-family: var(--pixel); font-size: clamp(7px, 1.2vw, 11px); background: #5a3a24; color: #ecd9a8; border: 2px solid var(--ink); border-bottom: 0; padding: 2px 0; pointer-events: none; }
+.vroom-note { margin: 0; color: #c9b38a; }
+.vroom-note a { color: var(--gold); }
+.vprompt { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 9; animation: walkbob .7s steps(2) infinite; }
+.vpad { position: absolute; right: 10px; bottom: 10px; z-index: 8; margin: 0; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 4px; opacity: .92; }
+.vpad button { font-size: 1.3rem; }
+@media (hover: hover) and (pointer: fine) { .vpad { opacity: .75; } }

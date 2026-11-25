@@ -72,15 +72,16 @@ export function buildVillage(count, seedText, exts = []) {
 
   // ---------- things standing on the ground (drawn back to front) ----------
   const sprites = [];
-  const add = (g, x, y) => sprites.push({ g, x: Math.round(x), y: Math.round(y) });
+  // box = the part you can't walk through (default: the bottom of the thing, like a tree trunk)
+  const add = (g, x, y, box) => sprites.push({ g, x: Math.round(x), y: Math.round(y), box });
   const castle = castleGrid(2, hashStr(seedText));
   const cx = Math.round((W - castle[0].length) / 2), cy = 14;
-  add(castle, cx, cy);
+  add(castle, cx, cy, [cx, cy, cx + castle[0].length - 1, cy + castle.length - 5]);
   const houses = [];
   for (let i = 0; i < count; i++) {
     const row = Math.floor(i / COLS.length), x = COLS[i % COLS.length], y = ROW0 + row * ROW_H;
-    add(houseGrid(exts[i] || 0, i + 3), x, y);
-    houses.push({ x, y, w: 36, h: 34 });
+    add(houseGrid(exts[i] || 0, i + 3), x, y, [x + 1, y + 6, x + 34, y + 30]);
+    houses.push({ x, y, w: 36, h: 34, door: { x: x + 11.5, y: y + 33 } });
   }
   add(wellGrid(), 112, NB + 16);
   for (const l of lots) add(signGrid(), l.x + 14, l.y + 4);
@@ -109,7 +110,21 @@ export function buildVillage(count, seedText, exts = []) {
   for (let x = 0; x < W; x += 8 + r() * 6) { if (x < cx - 8 || x > cx + castle[0].length + 4) add(tree(), x, -10 + r() * 8); add(tree(), x, H - 22 + r() * 6); if (r() < 0.5) add(tree(), x + 3, H - 30 + r() * 4); }
   sprites.sort((a, b) => a.y + a.g.length - (b.y + b.g.length));
 
-  return { W, H, ground, sprites, houses, castle: { x: cx, y: cy, w: castle[0].length, h: castle.length }, lots, pond };
+  // ---------- where you can walk ----------
+  const solid = new Uint8Array(W * H);
+  const block = (x0, y0, x1, y1) => { for (let y = Math.max(0, y0 | 0); y <= Math.min(H - 1, y1 | 0); y++) for (let x = Math.max(0, x0 | 0); x <= Math.min(W - 1, x1 | 0); x++) solid[y * W + x] = 1; };
+  const WATER = new Set(['#2a5e93', '#3f86c8', '#3778b8', '#9fd4f5', '#8fc8ef']);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (WATER.has(ground[y][x])) solid[y * W + x] = 1;
+  for (const sp of sprites) {
+    const w = sp.g[0].length, h = sp.g.length;
+    if (sp.box) block(...sp.box);
+    else block(sp.x + w * 0.3, sp.y + h - 4, sp.x + w * 0.7, sp.y + h - 1);
+  }
+  block(0, 0, 9, H - 1); block(W - 10, 0, W - 1, H - 1); block(0, 0, W - 1, 8); block(0, H - 12, W - 1, H - 1); // the forest edge
+  const castleBox = { x: cx, y: cy, w: castle[0].length, h: castle.length, door: { x: cx + 41.5, y: cy + castle.length - 2 } };
+  const start = { x: (ROAD[0] + ROAD[1]) / 2, y: RIVER + 18 };
+
+  return { W, H, ground, sprites, houses, castle: castleBox, lots, pond, solid, start };
 }
 
 // Paint a built village onto a <canvas> (one pixel per pixel; CSS scales it up crisply).
