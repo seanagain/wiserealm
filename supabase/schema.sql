@@ -636,18 +636,40 @@ begin
 end $$;
 
 -- Teachers can add colleagues (who then get their own separate classes and sets).
-create or replace function public.list_teachers() returns table (email text, signed_up boolean)
+-- Site admins approve teachers. Only approved teachers can run live games with real students.
+-- Make yourself the admin once in the SQL editor (your own email, not saved in this file):
+--   update public.teachers set is_admin = true where lower(email) = lower('you@example.com');
+alter table public.teachers add column if not exists is_admin boolean not null default false;
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.teachers t where t.is_admin and lower(t.email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+$$;
+create or replace function public.am_i_admin() returns boolean
+language sql stable security definer set search_path = public as $$ select public.is_admin(); $$;
+
+drop function if exists public.list_teachers();
+create or replace function public.list_teachers() returns table (email text, signed_up boolean, is_admin boolean)
 language plpgsql stable security definer set search_path = public as $$
 begin
-  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
-  return query select t.email, exists (select 1 from auth.users u where lower(u.email) = lower(t.email)) from public.teachers t order by t.email;
+  if not public.is_admin() then raise exception 'Only the site admin can manage teachers'; end if;
+  return query select t.email, exists (select 1 from auth.users u where lower(u.email) = lower(t.email)), t.is_admin from public.teachers t order by t.email;
 end $$;
+
+-- Is this live game code real, and started by an approved teacher? (Students' iPads check before
+-- joining, so only approved teachers can play with real students. Says nothing else about the game.)
+create or replace function public.game_ok(p_code text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.games g join public.profiles p on p.id = g.teacher_id
+    join public.teachers t on lower(t.email) = lower(p.email)
+    where g.code = p_code and g.created_at > now() - interval '12 hours');
+$$;
+grant execute on function public.game_ok(text) to anon, authenticated;
 
 create or replace function public.add_teacher(p_email text) returns boolean
 language plpgsql security definer set search_path = public as $$
 declare e text := lower(trim(p_email));
 begin
-  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  if not public.is_admin() then raise exception 'Only the site admin can add teachers'; end if;
   if e !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'That doesn''t look like an email address'; end if;
   insert into public.teachers (email) values (e) on conflict do nothing;
   return true;
@@ -656,7 +678,7 @@ end $$;
 create or replace function public.remove_teacher(p_email text) returns boolean
 language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_teacher() then raise exception 'Not a teacher'; end if;
+  if not public.is_admin() then raise exception 'Only the site admin can remove teachers'; end if;
   if lower(trim(p_email)) = lower(coalesce(auth.jwt() ->> 'email', '')) then raise exception 'You can''t remove yourself'; end if;
   delete from public.teachers where lower(email) = lower(trim(p_email));
   return true;
@@ -705,6 +727,8 @@ revoke all on function public.list_sets(), public.save_set(text, text, jsonb), p
 grant execute on function public.list_sets(), public.save_set(text, text, jsonb), public.delete_set(text), public.list_teachers(),
   public.add_teacher(text), public.remove_teacher(text), public.players_owned(uuid[]),
   public.game_roster(text), public.set_game_class(text, uuid) to authenticated;
+revoke all on function public.am_i_admin() from public, anon;
+grant execute on function public.am_i_admin() to authenticated;
 
 -- ================= Solo practice (study games) =================
 -- Teachers assign question sets to classes; students practice them in single-player games.

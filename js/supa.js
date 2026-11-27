@@ -112,6 +112,8 @@ const online = {
   saveSet(id, title, items) { return this.rpc('save_set', { p_id: id, p_title: title, p_items: items }); },
   deleteSet(id) { return this.rpc('delete_set', { p_id: id }); },
   listTeachers() { return this.rpc('list_teachers'); },
+  amIAdmin() { return this.rpc('am_i_admin'); },
+  gameOk(code) { return this.rpc('game_ok', { p_code: code }); },
   addTeacher(email) { return this.rpc('add_teacher', { p_email: email }); },
   removeTeacher(email) { return this.rpc('remove_teacher', { p_email: email }); },
   playersOwned(uids) { return uids.length ? this.rpc('players_owned', { p_users: uids }) : Promise.resolve([]); },
@@ -162,6 +164,8 @@ const demo = {
     p.avatar = avatar; save(DEMO_KEY, p); return p;
   },
   async isTeacher() { return true; },
+  async amIAdmin() { return true; },
+  async gameOk() { return true; },
   async createGame() { return true; },
   async joinGame(code, ticket) {
     const g = demoGames(); const e = g[code] = g[code] || { tickets: [], cls: null };

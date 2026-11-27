@@ -40,8 +40,9 @@ async function restBroadcast(topic, payload) {
 
 // role: 'host' or 'player'
 // Returns { mode, send(msg) → everyone in room, toHost(msg, {viaRoom}) → host only, close() }
-export async function openRoom(code, onMessage, role = 'player') {
-  if (isOnline()) {
+// opts.local: stay in this browser only (try-out mode), even when the site is online.
+export async function openRoom(code, onMessage, role = 'player', opts = {}) {
+  if (isOnline() && !opts.local) {
     const client = await getClient();
     const room = await subscribe(client, roomName(code), onMessage);
     const channels = [room];

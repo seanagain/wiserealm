@@ -269,9 +269,14 @@ async function initTeacherAccount() {
 // ---------------- Teachers (colleagues) ----------------
 async function renderTeachers() {
   try {
+    if (!(await accounts.amIAdmin())) {
+      $('#teacherList').innerHTML = '<p class="muted">Only the WiseRealm admin can approve teachers. Ask them to add your colleague’s school email.</p>';
+      $('#addTeacher').closest('.flex') ? ($('#addTeacher').closest('.flex').hidden = true) : ($('#addTeacher').hidden = true);
+      return;
+    }
     const list = await accounts.listTeachers();
     $('#teacherList').innerHTML = `<table class="data-table"><thead><tr><th>Email</th><th>Status</th><th></th></tr></thead><tbody>
-      ${list.map(t => `<tr><td>${esc(t.email)}</td><td class="muted">${t.signed_up ? 'Has signed in' : 'Not signed in yet'}</td>
+      ${list.map(t => `<tr><td>${esc(t.email)}${t.is_admin ? ' <span class="good">(admin)</span>' : ''}</td><td class="muted">${t.signed_up ? 'Has signed in' : 'Not signed in yet'}</td>
         <td><button class="btn small danger" data-rm-teacher="${esc(t.email)}">Remove</button></td></tr>`).join('')}</tbody></table>`;
   } catch (e) { $('#teacherList').textContent = e.message; }
 }

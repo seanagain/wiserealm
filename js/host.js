@@ -601,7 +601,8 @@ async function setupTeacher() {
       box.innerHTML = `<b>Coins: off</b><br><span class="muted">${esc(user.email)} isn’t on the teacher list (see README).</span>`;
       return;
     }
-    await accounts.createGame(code, mode.id);
+    if (!G.gameCreated) await accounts.createGame(code, mode.id);
+    G.gameCreated = true;
     G.teacher = true;
     roster.clear();
     loadNameFilter();
@@ -640,7 +641,7 @@ $('#addBots').onclick = () => {
   }
   sfx('join'); renderRoster();
 };
-$('#openStudent').onclick = () => window.open(joinBase + 'index.html?join=' + code, '_blank');
+$('#openStudent').onclick = () => window.open(joinBase + 'index.html?join=' + code + (G.tryout ? '&local=1' : ''), '_blank');
 
 // ---------------- Game flow ----------------
 async function startGame() {
@@ -911,11 +912,27 @@ window.addEventListener('resize', () => { if (G.phase !== 'lobby' && mode.render
   refreshMute();
   setupLobby();
   show('lobbyScreen');
+  // Only teachers the WiseRealm admin approved can open a game to real students. Everyone else
+  // gets try-out mode: the same games, with test bots and test-student tabs in this browser.
+  let approved = !isOnline();
+  if (isOnline()) {
+    try {
+      const u = await accounts.user();
+      if (u && await accounts.isTeacher()) { await accounts.createGame(code, mode.id); G.gameCreated = true; approved = true; }
+    } catch (e) { console.warn(e); }
+  }
+  G.tryout = !approved;
   try {
-    net = await openRoom(code, onMsg, 'host');
+    net = await openRoom(code, onMsg, 'host', { local: G.tryout });
   } catch (e) {
     console.error(e);
     return fail('Could not connect to the game server. Check the internet connection and the Supabase settings in js/config.js, then reload.');
+  }
+  if (G.tryout) {
+    // no join code or QR for students: this game can't be reached from other devices
+    $('.join-row').hidden = true;
+    $('#localNote').hidden = false;
+    $('#localNote').innerHTML = '🧪 <b>Try-out mode.</b> Only teachers approved by the WiseRealm admin can play with students. Try any game here with <b>+ Add test bots</b> and <b>Open a test student</b>. Approved? Sign in with the button on the right.';
   }
   setupTeacher();
 })();

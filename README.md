@@ -99,6 +99,16 @@ their iPads while the game runs on the projector. Playing earns coins to spend i
 
 ## Teacher account
 
+- **Only teachers approved by the site admin can play with real students.** Anyone else (or a
+  teacher who isn't signed in) gets **try-out mode** on the projector: every game works with test
+  bots and "Open a test student" tabs in the same browser, but there's no join code, and students'
+  devices can't join (their iPad checks with the database that the game was started by an approved
+  teacher).
+- **Approving teachers is admin-only.** Make yourself the admin once in Supabase's SQL editor (with
+  your own email):
+  `update public.teachers set is_admin = true where lower(email) = lower('you@example.com');`
+  Then add colleagues under **Teachers (approve colleagues)** on the teacher page.
+
 - Sign in at the top of the teacher page. Your **question sets are saved to your account**
   and appear on any computer where you sign in (the first time you sign in, sets already on
   that computer are uploaded). The badge shows "☁ Saved to your account".

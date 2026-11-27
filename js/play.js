@@ -174,7 +174,16 @@ async function connect() {
   joined = false; shownKey = null; last = null; myAns = -1;
   try {
     if (net && netCode !== code) { net.close(); net = null; }
-    if (!net) { net = await openRoom(code, onMsg, 'player'); netCode = code; }
+    const local = new URLSearchParams(location.search).get('local') === '1'; // a try-out test tab
+    if (!net) {
+      // Only games started by an approved teacher can be joined from a student's device.
+      if (!local && isOnline() && !(await accounts.gameOk(code))) {
+        $('#joinErr').textContent = `Couldn’t find game ${code}. Check the code on the big screen.`;
+        show('s-join');
+        return;
+      }
+      net = await openRoom(code, onMsg, 'player', { local }); netCode = code;
+    }
   } catch (e) {
     console.error(e);
     return message('Could not connect. Check your internet and try again.');
